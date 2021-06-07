@@ -1,32 +1,174 @@
+#![feature(destructuring_assignment)]
 #![allow(unused_imports)]
 
 use piston_window::{
-    AdvancedWindow, Button, Event, EventLoop, Key, OpenGL, PistonWindow, PressEvent, Size, Window,
+    texture::UpdateTexture,
+    AdvancedWindow,
+    Button,
+    EventLoop,
+    Flip,
+    G2d,
+    G2dTexture,
+    Key,
+    OpenGL,
+    PistonWindow,
+    PressEvent,
+    ResizeEvent,
+    Size,
+    Texture,
+    TextureSettings,
+    UpdateEvent,
+    Window,
     WindowSettings,
 };
 use sdl2::video::FullscreenType;
 use sdl2_window::Sdl2Window;
+use std::path::PathBuf;
 
-#[tokio::main]
-async fn main() {
+// #[tokio::main]
+//pub async fn main() {
+pub fn main() {
+    const WIDTH: u32 = conrod_example_shared::WIN_W;
+    const HEIGHT: u32 = conrod_example_shared::WIN_H;
     let gl = OpenGL::V4_5;
-    let mut window: PistonWindow<Sdl2Window> = WindowSettings::new("Downloader", [1., 1.])
-        .exit_on_esc(true)
-        .samples(16)
-        .vsync(true)
-        .graphics_api(gl)
-        .build()
-        .expect("Couldn't create a window");
+    let mut window: PistonWindow<Sdl2Window> =
+        WindowSettings::new("conrod testing", [WIDTH, HEIGHT])
+            .samples(16)
+            .exit_on_esc(true)
+            .vsync(true)
+            .graphics_api(gl)
+            .build()
+            .expect("Couldn't create a window");
     window.set_capture_cursor(false);
-    window.set_max_fps(60);
-    window.set_ups(30);
-    while let Some(e) = window.next() {
-        if let Some(button) = e.press_args() {
+    window.set_max_fps(120);
+    window.set_ups(60);
+
+    // construct our `Ui`.
+    let mut ui = conrod_core::UiBuilder::new([WIDTH as f64, HEIGHT as f64])
+        .theme(conrod_example_shared::theme())
+        .build();
+
+    let assets = PathBuf::from("assets");
+    let font_path = assets.join("NotoSans-Regular.ttf");
+    ui.fonts.insert_from_file(font_path).unwrap();
+
+    let mut texture_context = window.create_texture_context();
+
+    // Create a texture to use for efficiently caching text on the GPU.
+    let mut text_vertex_data = Vec::new();
+    let (mut glyph_cache, mut text_texture_cache) = {
+        const SCALE_TOLERANCE: f32 = 0.1;
+        const POSITION_TOLERANCE: f32 = 0.1;
+        let cache = conrod_core::text::GlyphCache::builder()
+            .dimensions(WIDTH, HEIGHT)
+            .scale_tolerance(SCALE_TOLERANCE)
+            .position_tolerance(POSITION_TOLERANCE)
+            .build();
+        let buffer_len = WIDTH as usize * HEIGHT as usize;
+        let init = vec![128; buffer_len];
+        let settings = TextureSettings::new();
+        let texture = G2dTexture::from_memory_alpha(
+            &mut texture_context,
+            &init,
+            WIDTH,
+            HEIGHT,
+            &settings,
+        )
+        .unwrap();
+        (cache, texture)
+    };
+
+    // Instantiate the generated list of widget identifiers.
+    let ids = conrod_example_shared::Ids::new(ui.widget_id_generator());
+
+    // Load the rust logo from file to a piston_window texture.
+    let rust_logo: G2dTexture = {
+        let path = assets.join("images/rust.png");
+        let settings = TextureSettings::new();
+        Texture::from_path(&mut texture_context, &path, Flip::None, &settings)
+            .unwrap()
+    };
+
+    // Create our `conrod_core::image::Map` which describes each of our
+    // widget->image mappings.
+    let mut image_map = conrod_core::image::Map::new();
+    let rust_logo = image_map.insert(rust_logo);
+
+    // A demonstration of some state that we'd like to control with the App.
+    let mut app = conrod_example_shared::DemoApp::new(rust_logo);
+
+    while let Some(event) = window.next() {
+        // Convert the src event to a conrod event.
+        let size = window.size();
+        let (win_w, win_h) = (
+            size.width as conrod_core::Scalar,
+            size.height as conrod_core::Scalar,
+        );
+        if let Some(e) =
+            conrod_piston::event::convert(event.clone(), win_w, win_h)
+        {
+            ui.handle_event(e);
+        }
+
+        event.update(|_| {
+            let mut ui = ui.set_widgets();
+            conrod_example_shared::gui(&mut ui, &ids, &mut app);
+        });
+
+        window.draw_2d(&event, |context, graphics, device| {
+            if let Some(primitives) = ui.draw_if_changed() {
+                // A function used for caching glyphs to the texture cache.
+                let cache_queued_glyphs =
+                    |_graphics: &mut G2d,
+                     cache: &mut G2dTexture,
+                     rect: conrod_core::text::rt::Rect<u32>,
+                     data: &[u8]| {
+                        let offset = [rect.min.x, rect.min.y];
+                        let size = [rect.width(), rect.height()];
+                        let format = piston_window::texture::Format::Rgba8;
+                        text_vertex_data.clear();
+                        text_vertex_data.extend(
+                            data.iter().flat_map(|&b| vec![255, 255, 255, b]),
+                        );
+                        UpdateTexture::update(
+                            cache,
+                            &mut texture_context,
+                            format,
+                            &text_vertex_data[..],
+                            offset,
+                            size,
+                        )
+                        .expect("failed to update texture")
+                    };
+
+                // Specify how to get the drawable texture from the image. In this
+                // case, the image *is* the texture.
+                fn texture_from_image<T>(img: &T) -> &T { img }
+
+                // Draw the conrod `render::Primitives`.
+                conrod_piston::draw::primitives(
+                    primitives,
+                    context,
+                    graphics,
+                    &mut text_texture_cache,
+                    &mut glyph_cache,
+                    &image_map,
+                    cache_queued_glyphs,
+                    texture_from_image,
+                );
+
+                texture_context.encoder.flush(device);
+            }
+        });
+        if let Some(button) = event.press_args() {
             if let Button::Keyboard(key) = button {
                 match key {
                     Key::R => println!("{}", "This"),
                     Key::Q => break,
-                    Key::F | Key::F12 => fullscreen(&mut window),
+                    Key::F | Key::F12 => {
+                        fullscreen(&mut window);
+                        ui.needs_redraw()
+                    }
                     _ => {}
                 }
             }
@@ -35,8 +177,14 @@ async fn main() {
 }
 fn fullscreen(window: &mut PistonWindow<Sdl2Window>) {
     match window.window.window.fullscreen_state() {
-        FullscreenType::Off => &window.window.window.set_fullscreen(FullscreenType::Desktop),
-        FullscreenType::True => &window.window.window.set_fullscreen(FullscreenType::Desktop),
-        FullscreenType::Desktop => &window.window.window.set_fullscreen(FullscreenType::Off),
+        FullscreenType::Off => {
+            &window.window.window.set_fullscreen(FullscreenType::Desktop)
+        }
+        FullscreenType::True => {
+            &window.window.window.set_fullscreen(FullscreenType::Desktop)
+        }
+        FullscreenType::Desktop => {
+            &window.window.window.set_fullscreen(FullscreenType::Off)
+        }
     };
 }
