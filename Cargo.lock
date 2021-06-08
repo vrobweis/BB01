@@ -131,6 +131,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "143e0b8a955e5ddecb43191ddceb2d5793f68653d397959b75c82f0e3bfad4ba"
 
 [[package]]
+name = "conrod-adhoc"
+version = "0.1.0"
+dependencies = [
+ "conrod",
+ "conrod_core",
+ "conrod_example_shared",
+ "conrod_piston",
+ "directories-next",
+ "piston_window",
+ "pistoncore-sdl2_window",
+ "sdl2",
+ "serde",
+ "serde_json",
+ "serde_with",
+]
+
+[[package]]
 name = "conrod_core"
 version = "0.73.0"
 dependencies = [
@@ -348,23 +365,6 @@ dependencies = [
  "libc",
  "redox_users",
  "winapi",
-]
-
-[[package]]
-name = "display"
-version = "0.1.0"
-dependencies = [
- "conrod",
- "conrod_core",
- "conrod_example_shared",
- "conrod_piston",
- "directories-next",
- "piston_window",
- "pistoncore-sdl2_window",
- "sdl2",
- "serde",
- "serde_json",
- "serde_with",
 ]
 
 [[package]]
