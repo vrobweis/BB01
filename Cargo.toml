@@ -2,11 +2,17 @@
 authors = ["simdimdim <simdimdim@gmail.com>"]
 default-run = "main"
 edition = "2018"
-name = "conrod-adhoc"
+name = "pagepal"
 resolver = "2"
-version = "0.1.0"
+version = "0.1.2"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[package.metadata.vcpkg]
+branch = "master"
+git = "https://github.com/microsoft/vcpkg"
+
+[package.metadata.vcpkg.target]
+x86_64-pc-windows-msvc = {triplet = "x64-windows-static-md"}
 
 [dependencies]
 conrod = "0.62.1"
@@ -14,13 +20,19 @@ conrod_core = {path = "../conrod/conrod_core"}
 conrod_example_shared = {path = "../conrod/backends/conrod_example_shared"}
 conrod_piston = {path = "../conrod/backends/conrod_piston"}
 
+http-serde = "1.0.2"
 serde = { version = "1.0.126", features = ["derive"] }
 serde_json = "1.0.64"
-serde_with = { version = "1.9.1", features = ["json", "macros"] }
+serde_with = { version = "1.9.2", features = ["json", "macros"] }
+
+directories-next = "2.0.0"
+hentai = "0.2.2"
+
+reqwest = "0.11.3"
+select = "0.6.0-alpha.1"
 
 # futures = "0.3.15"
-# tokio = { version = "1.6.1", features = ["fs", "macros", "rt-multi-thread"] }
-directories-next = "2.0.0"
+tokio = { version = "1.6.1", features = ["fs", "time", "net", "macros", "rt-multi-thread"] }
 
 [target.'cfg(linux)'.dependencies.sdl2]
 features = []

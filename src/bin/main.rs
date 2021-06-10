@@ -1,11 +1,11 @@
 #![feature(destructuring_assignment)]
 #![allow(unused_imports)]
 
-use conrod_adhoc::{fullscreen, theme};
 use conrod_core::{text::rt::Rect, Scalar};
 use conrod_example_shared as example;
 use conrod_piston::{draw::primitives as draw_primitives, event::convert};
 use example::DemoApp;
+use pagepal::{fullscreen, library::Library, theme};
 use piston_window::{
     texture::{Format::Rgba8, UpdateTexture},
     AdvancedWindow,
@@ -29,17 +29,18 @@ use piston_window::{
 use sdl2_window::Sdl2Window;
 use std::path::PathBuf;
 
-// #[tokio::main]
-//pub async fn main() {
-pub fn main() {
+#[tokio::main]
+pub async fn main() {
+// pub fn main() {
     let gl = OpenGL::V4_5;
     const WIDTH: u32 = example::WIN_W;
     const HEIGHT: u32 = example::WIN_H;
     let assets = PathBuf::from("assets");
     let font_path = assets.join("NotoSans-Regular.ttf");
+    let _library = Library::default();
 
     let mut window: PistonWindow<Sdl2Window> =
-        WindowSettings::new("conrod testing", [WIDTH, HEIGHT])
+        WindowSettings::new("Pagepal conrod testing", [WIDTH, HEIGHT])
             .samples(16)
             .exit_on_esc(true)
             .vsync(true)
