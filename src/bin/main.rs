@@ -29,9 +29,9 @@ use piston_window::{
 use sdl2_window::Sdl2Window;
 use std::path::PathBuf;
 
-#[tokio::main]
-pub async fn main() {
-// pub fn main() {
+pub fn main() {
+    // #[tokio::main]
+    // pub async fn main() {
     let gl = OpenGL::V4_5;
     const WIDTH: u32 = example::WIN_W;
     const HEIGHT: u32 = example::WIN_H;
@@ -44,9 +44,10 @@ pub async fn main() {
             .samples(16)
             .exit_on_esc(true)
             .vsync(true)
+            .resizable(true)
             .graphics_api(gl)
             .build()
-            .expect("Couldn't create a window");
+            .expect("You encountered this error");
     window.set_capture_cursor(false);
     window.set_max_fps(120);
     window.set_ups(60);
