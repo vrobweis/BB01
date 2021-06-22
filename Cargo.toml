@@ -48,7 +48,7 @@ version = "0.120.0"
 git = "https://github.com/PistonDevelopers/sdl2_window"
 # path = "../sdl2_window"
 
-[target.'cfg(not(target_os = "linux"))'.features]
-default = ["sdl2/bundled", "sdl2/use-vcpkg"]
+[target.'cfg(not(target_os = "linux"))'.sdl2]
+features = ["bundled", "use-vcpkg"]
 # [target.'cfg(target_os = "linux")'.features]
 # sdl2 = []

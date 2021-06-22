@@ -1,6 +1,3 @@
-#![feature(with_options)]
-#![feature(destructuring_assignment)]
-
 pub mod functions;
 pub mod library;
 pub mod retriever;
