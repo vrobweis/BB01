@@ -157,17 +157,10 @@ impl Hash for Page {
         self.full.hash(state);
     }
 }
-impl From<String> for Page {
-    fn from(src: String) -> Self { Self::new(&src) }
-}
-impl From<&String> for Page {
-    fn from(src: &String) -> Self { Self::new(src) }
-}
-impl From<Url> for Page {
-    fn from(src: Url) -> Self { src.to_string().into() }
-}
-impl From<&Url> for Page {
-    fn from(src: &Url) -> Self { src.to_string().into() }
+impl<T: Into<String>> From<T> for Page {
+    fn from(src: T) -> Self {
+        Self::new(&src.into())
+    }
 }
 impl FromStr for Page {
     type Err = url::ParseError;
