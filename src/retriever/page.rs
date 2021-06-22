@@ -61,7 +61,6 @@ impl Page {
         self
     }
 
-
     pub async fn request(&mut self, re: Request) -> &Self {
         self.req = Some(Rc::new(re));
         self.full = false;
