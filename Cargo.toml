@@ -45,10 +45,10 @@ version = "1.7.1"
 default-features = false
 version = "0.120.0"
 [dependencies.pistoncore-sdl2_window]
-# git = "https://github.com/PistonDevelopers/sdl2_window"
-path = "../sdl2_window"
+git = "https://github.com/PistonDevelopers/sdl2_window"
+# path = "../sdl2_window"
 
-# [target.'cfg(target_os = "linux")'.features]
-# sdl2 = []
 [target.'cfg(not(target_os = "linux"))'.features]
 default = ["sdl2/bundled", "sdl2/use-vcpkg"]
+# [target.'cfg(target_os = "linux")'.features]
+# sdl2 = []

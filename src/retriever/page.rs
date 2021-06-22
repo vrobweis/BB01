@@ -1,5 +1,5 @@
 use chrono::{DateTime, Duration, Utc};
-use reqwest::{Client, Request,  Url};
+use reqwest::{Client, Request, Url};
 use select::document::Document;
 use serde::{Deserialize as des, Serialize as ser};
 use std::{
@@ -29,7 +29,7 @@ pub struct Page {
     #[serde(skip)]
     req:     RefCell<Option<Rc<Request>>>,
     #[serde(skip)]
-    client:  Rc<Client>,
+    client:  Client,
     full:    RefCell<bool>,
 }
 
@@ -61,7 +61,7 @@ impl Page {
         self
     }
 
-    pub async fn request(&self, re: Request) -> &Self {
+    pub fn request(&self, re: Request) -> &Self {
         self.req.clone().replace(Some(Rc::new(re)));
         self.full.replace(false);
         self
