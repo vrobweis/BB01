@@ -1,4 +1,3 @@
-#![feature(destructuring_assignment)]
 #![allow(unused_imports)]
 
 use conrod_core::{text::rt::Rect, Scalar};
