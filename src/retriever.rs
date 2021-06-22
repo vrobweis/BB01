@@ -7,7 +7,6 @@ use std::{
         BTreeMap,
         HashMap,
     },
-    rc::Rc,
     string::ParseError,
     sync::Arc,
 };
@@ -24,7 +23,7 @@ pub use self::{headers::*, page::*};
 pub struct Retriever {
     headers: BTreeMap<String, Headers>,
     #[serde(skip)]
-    client:  Rc<Client>,
+    client:  Client,
     #[serde(skip)]
     sites:   Arc<Mutex<HashMap<String, Delay>>>,
     #[serde(skip)]
@@ -32,7 +31,7 @@ pub struct Retriever {
 }
 
 impl Retriever {
-    pub async fn dl(&self, p: Page) -> Result<(), ParseError> {
+    pub async fn dl(&self, mut p: Page) -> Result<(), ParseError> {
         if p.is_old(None) {
             self.access(&p).await;
         }
@@ -42,7 +41,7 @@ impl Retriever {
             .map(Headers::to_owned)
             .unwrap_or_default()
             .headers;
-        p.request(self.client.get(&p.loc).headers(headers).build().unwrap());
+        p.request(self.client.get(&p.loc).headers(headers).build().unwrap()).await;
 
         Ok(())
     }
