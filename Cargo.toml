@@ -26,28 +26,29 @@ directories-next = "2.0.0"
 
 reqwest = "0.11.4"
 select = "0.6.0-alpha.1"
-url = "2.2.2"
+url = { version = "2.2.2", features = ["serde"] }
 
 http-serde = "1.0.2"
 serde = { version = "1.0.126", features = ["derive"] }
-serde_json = "1.0.64"
-serde_with = { version = "1.9.4", features = ["json", "macros"] }
+# serde_json = "1.0.64"
+serde_traitobject = "0.2.7"
+serde_with = { version = "1.9.4", features = ["macros"] }
 
 chrono = { version = "0.4.19", features = ["serde"] }
 # futures = "0.3.15"
 # tokio_schedule = "0.3.0" # https://docs.rs/tokio_schedule/0.3.0/tokio_schedule/
+
 [dependencies.tokio]
 features = ["fs", "time", "net", "macros", "rt-multi-thread"]
 version = "1.7.1"
-
 [dependencies.piston_window]
 default-features = false
 version = "0.120.0"
 [dependencies.pistoncore-sdl2_window]
 git = "https://github.com/PistonDevelopers/sdl2_window"
 
-[target.'cfg(target_os = "linux")'.dependencies]
-sdl2 = "0.34.5"
 [target.'cfg(not(target_os = "linux"))'.dependencies.sdl2]
 features = ["bundled", "use-vcpkg"]
 version = "0.34.5"
+[target.'cfg(target_os = "linux")'.dependencies]
+sdl2 = "0.34.5"

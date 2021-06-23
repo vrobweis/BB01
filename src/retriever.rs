@@ -2,6 +2,8 @@ use self::delay::Delay;
 use crate::Label;
 use reqwest::Client;
 use serde::{Deserialize as des, Serialize as ser};
+use serde_traitobject as s;
+use serde_with::serde_as;
 use std::{
     collections::{
         hash_map::Entry::{Occupied, Vacant},
@@ -14,6 +16,7 @@ use std::{
     sync::Arc,
 };
 use tokio::sync::Mutex;
+use url::Host;
 
 pub mod delay;
 pub mod finder;
@@ -23,16 +26,22 @@ pub mod page;
 pub use self::{finder::*, headers::*, page::*};
 
 #[derive(Clone, Default, ser, des)]
+pub struct FindWrap(
+    #[serde(with = "serde_traitobject")] pub Rc<Option<s::Box<dyn Finder>>>,
+);
+
+#[serde_as]
+#[derive(Clone, Default, ser, des)]
 pub struct Retriever {
-    headers: BTreeMap<String, Headers>,
+    headers: BTreeMap<Host, Headers>,
     #[serde(skip)]
     client:  Client,
     #[serde(skip)]
-    sites:   Arc<Mutex<HashMap<String, Delay>>>,
+    sites:   Arc<Mutex<HashMap<Host, Delay>>>,
     #[serde(skip)]
     cntmap:  Arc<HashMap<Label, Page>>,
-    #[serde(skip)]
-    finders: BTreeMap<Find, Rc<Option<Box<dyn Finder>>>>,
+    #[serde_as(as = "Vec<(_, _)>")]
+    finders: BTreeMap<Host, FindWrap>,
     //add new fields to the Debug impl
 }
 impl Retriever {
@@ -42,14 +51,20 @@ impl Retriever {
         }
         let headers = self
             .headers
-            .get(&p.domain())
+            .get(&p.domain().unwrap())
             .map(Headers::to_owned)
             .unwrap_or_default()
             .headers;
-        p.request(self.client.get(&p.loc).headers(headers).build().unwrap())
-            .refresh(&self.client)
-            .await
-            .unwrap();
+        p.request(
+            self.client
+                .get(p.loc.as_str())
+                .headers(headers)
+                .build()
+                .unwrap(),
+        )
+        .refresh(&self.client)
+        .await
+        .unwrap();
         Ok(p)
     }
 
@@ -59,7 +74,7 @@ impl Retriever {
 
     /// Keeps track of domains being accessed and adds delay between accessed
     async fn access(&self, p: &Page) {
-        match self.sites.lock().await.entry(p.domain()) {
+        match self.sites.lock().await.entry(p.domain().unwrap()) {
             Occupied(mut e) => {
                 e.get_mut().delay(super::duration()).await;
             }

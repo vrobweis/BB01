@@ -13,11 +13,12 @@ use std::{
     rc::Rc,
     str::FromStr,
 };
+use url::Host;
 
 impl Default for Page {
     fn default() -> Self {
         Self {
-            loc:  "".to_owned(),
+            loc:  "http://codenova.ddns.net/".parse().unwrap(),
             last: Utc::now(),
             html: RefCell::new(None),
             doc:  RefCell::new(None),
@@ -26,9 +27,10 @@ impl Default for Page {
         }
     }
 }
+
 #[derive(Clone, Debug, ser, des)]
 pub struct Page {
-    pub loc:  String,
+    pub loc:  Url,
     last:     DateTime<Utc>,
     #[serde(skip)]
     html:     RefCell<Option<String>>,
@@ -64,13 +66,16 @@ impl Page {
         self
     }
 
-    pub fn domain(&self) -> String {
-        (&self.loc)
-            .parse::<Url>()
-            .unwrap()
-            .domain()
-            .unwrap()
-            .to_owned()
+    /// Get the `example.com` from `http://example.com/path/`
+    /// would fail for http://localhost/path
+    pub fn domain(&self) -> Result<Host, String> {
+        match self.loc.host() {
+            Some(d) => Ok(d.to_owned()),
+            // for treating IPs differently
+            // Some(d @ Host::Ipv4(_)) => Ok(d.to_owned()),
+            // Some(d @ Host::Ipv6(_)) => Ok(d.to_owned()),
+            _ => Err("No host.".to_owned()),
+        }
     }
 
     pub async fn next(&self, client: &Client, pred: &str) -> Option<Page> {
@@ -92,9 +97,9 @@ impl Page {
 
     /// Returns a Page leading the the index page of the chapter
     pub fn index(&self) -> Result<Self, url::ParseError> {
-        let url = self.loc.parse::<Url>().unwrap();
-        let base = url.origin().ascii_serialization();
-        let mut index = url
+        let base = self.loc.origin().ascii_serialization();
+        let mut index = self
+            .loc
             .path_segments()
             .unwrap()
             .rev()
@@ -121,8 +126,8 @@ impl Page {
     }
 
     pub fn get_place(&self) -> (u16, u16, String) {
-        let url = self.loc.parse::<Url>().expect("Not a Url string.");
-        let segments = url
+        let segments = self
+            .loc
             .path_segments()
             .unwrap()
             .rev()
@@ -158,6 +163,12 @@ impl Page {
         (self.last + d.unwrap_or(Duration::seconds(10))) < Utc::now() ||
             self.full.get()
     }
+}
+
+impl Finder for Page {}
+impl Get for Page {
+    #[inline]
+    fn doc(&self) -> Ref<'_, Option<Document>> { self.doc.borrow() }
 }
 
 impl Eq for Page {}
@@ -196,22 +207,15 @@ impl Hash for Page {
     }
 }
 impl<T: Into<String>> From<T> for Page {
-    fn from(src: T) -> Self {
-        Self {
-            loc: src.into(),
-            ..Default::default()
-        }
-    }
+    fn from(src: T) -> Self { (&src.into()).parse().unwrap() }
 }
 impl FromStr for Page {
     type Err = url::ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse::<Url>().map(|a| Page::from(a.to_string()))
+        Ok(Self {
+            loc: s.parse::<Url>()?,
+            ..Default::default()
+        })
     }
-}
-impl Finder for Page {}
-impl Get for Page {
-    #[inline]
-    fn doc(&self) -> Ref<'_, Option<Document>> { self.doc.borrow() }
 }

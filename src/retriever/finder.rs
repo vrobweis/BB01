@@ -3,14 +3,11 @@ use select::{
     document::Document,
     predicate::{Child, Descendant, Name, Or, Text},
 };
-use serde::{Deserialize as des, Serialize as ser};
+use serde_traitobject::{Deserialize as des, Serialize as ser};
 use std::cell::Ref;
 
-#[derive(Clone, Default, Eq, PartialEq, Ord, PartialOrd, Debug, ser, des)]
-pub struct Find(u8, String);
-
 type Doc<'a> = Ref<'a, Option<Document>>;
-pub trait Finder {
+pub trait Finder: des + ser {
     /// Returns the text from the children of the <div> with most <p> tags
     #[inline]
     fn text_def(&self) -> Box<dyn Fn(Doc) -> Option<Vec<String>>> {
