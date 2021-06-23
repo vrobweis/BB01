@@ -27,10 +27,10 @@ pub struct Page {
     #[serde(skip)]
     doc:     RefCell<Option<Document>>,
     #[serde(skip)]
-    req:     RefCell<Option<Rc<Request>>>,
+    req:     Option<Rc<Request>>,
     #[serde(skip)]
     client:  Client,
-    full:    RefCell<bool>,
+    full:    bool,
 }
 
 impl Page {
@@ -43,8 +43,8 @@ impl Page {
         url.into()
     }
 
-    pub async fn refresh(&self) -> &Self {
-        match &*self.req.borrow() {
+    pub async fn refresh(&mut self) -> &Self {
+        match &self.req {
             Some(r) => self.set(
                 self.client
                     .execute(r.try_clone().unwrap())
@@ -57,13 +57,13 @@ impl Page {
             ),
             None => todo!(),
         }
-        self.full.replace(true);
+        self.full = true;
         self
     }
 
-    pub fn request(&self, re: Request) -> &Self {
-        self.req.clone().replace(Some(Rc::new(re)));
-        self.full.replace(false);
+    pub async fn request(&mut self, re: Request) -> &Self {
+        self.req = Some(Rc::new(re));
+        self.full = false;
         self
     }
 
@@ -117,7 +117,7 @@ impl Page {
 
     pub fn is_old(&self, d: Option<Duration>) -> bool {
         (self.last + d.unwrap_or(Duration::seconds(10))) < Utc::now() ||
-            *self.full.borrow()
+            self.full
     }
 }
 
@@ -153,20 +153,13 @@ impl Hash for Page {
         self.loc.hash(state);
         self.last.hash(state);
         (*self.html.borrow()).hash(state);
-        (*self.full.borrow()).hash(state);
+        self.full.hash(state);
     }
 }
-impl From<String> for Page {
-    fn from(src: String) -> Self { Self::new(&src) }
-}
-impl From<&String> for Page {
-    fn from(src: &String) -> Self { Self::new(src) }
-}
-impl From<Url> for Page {
-    fn from(src: Url) -> Self { src.to_string().into() }
-}
-impl From<&Url> for Page {
-    fn from(src: &Url) -> Self { src.to_string().into() }
+impl<T: Into<String>> From<T> for Page {
+    fn from(src: T) -> Self {
+        Self::new(&src.into())
+    }
 }
 impl FromStr for Page {
     type Err = url::ParseError;
