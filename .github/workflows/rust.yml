@@ -13,8 +13,9 @@ jobs:
   ubuntu-latest:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        rust: [stable, nightly]
+        rust: [nightly, stable]
     steps:
       - uses: actions/checkout@v2
       - name: install_dependencies
@@ -31,8 +32,9 @@ jobs:
   windows-latest:
     runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
-        rust: [stable, nightly]
+        rust: [nightly, stable]
     steps:
       - uses: actions/checkout@v2
       - name: install_dependencies
