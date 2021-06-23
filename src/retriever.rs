@@ -1,3 +1,4 @@
+use self::delay::Delay;
 use crate::Label;
 use reqwest::Client;
 use serde::{Deserialize as des, Serialize as ser};
@@ -7,19 +8,21 @@ use std::{
         BTreeMap,
         HashMap,
     },
+    fmt::Debug,
+    rc::Rc,
     string::ParseError,
     sync::Arc,
 };
 use tokio::sync::Mutex;
 
 pub mod delay;
+pub mod finder;
 pub mod headers;
 pub mod page;
 
-use self::delay::Delay;
-pub use self::{headers::*, page::*};
+pub use self::{finder::*, headers::*, page::*};
 
-#[derive(Clone, Default, Debug, ser, des)]
+#[derive(Clone, Default, ser, des)]
 pub struct Retriever {
     headers: BTreeMap<String, Headers>,
     #[serde(skip)]
@@ -28,10 +31,12 @@ pub struct Retriever {
     sites:   Arc<Mutex<HashMap<String, Delay>>>,
     #[serde(skip)]
     cntmap:  Arc<HashMap<Label, Page>>,
+    #[serde(skip)]
+    finders: BTreeMap<Find, Rc<Option<Box<dyn Finder>>>>,
+    //add new fields to the Debug impl
 }
-
 impl Retriever {
-    pub async fn dl(&self, mut p: Page) -> Result<(), ParseError> {
+    pub async fn dl(&self, p: Page) -> Result<Page, ParseError> {
         if p.is_old(None) {
             self.access(&p).await;
         }
@@ -41,13 +46,18 @@ impl Retriever {
             .map(Headers::to_owned)
             .unwrap_or_default()
             .headers;
-        p.request(self.client.get(&p.loc).headers(headers).build().unwrap()).await;
-
-        Ok(())
+        p.request(self.client.get(&p.loc).headers(headers).build().unwrap())
+            .refresh(&self.client)
+            .await
+            .unwrap();
+        Ok(p)
     }
 
     pub async fn get_cnt(&self) { self.cntmap.clone().get(&Label::default()); }
 
+    pub async fn get_page(&self, p: Page) -> Result<Page, Page> { Ok(p) }
+
+    /// Keeps track of domains being accessed and adds delay between accessed
     async fn access(&self, p: &Page) {
         match self.sites.lock().await.entry(p.domain()) {
             Occupied(mut e) => {
@@ -57,5 +67,17 @@ impl Retriever {
                 e.insert(Default::default());
             }
         }
+        // TODO: Maybe add a trim function for the map that runs occasionally
+    }
+}
+
+impl Debug for Retriever {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Retriever")
+            .field("headers", &self.headers)
+            .field("client", &self.client)
+            .field("sites", &self.sites)
+            .field("cntmap", &self.cntmap)
+            .finish()
     }
 }
