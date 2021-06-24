@@ -1,3 +1,4 @@
+use crate::Retriever;
 use serde::{Deserialize as des, Serialize as ser};
 use serde_with::serde_as;
 use std::collections::HashMap;
@@ -5,19 +6,32 @@ use std::collections::HashMap;
 pub mod book;
 pub mod chapter;
 pub mod content;
-pub mod internals;
+pub mod id;
 
-pub(crate) use self::{book::*, chapter::*, content::*, internals::*};
+pub(crate) use self::{book::*, chapter::*, content::*};
 
 #[serde_as]
 #[derive(Default, Debug, Clone, ser, des)]
 pub struct Library {
     #[serde_as(as = "Vec<(_, _)>")]
-    books: HashMap<Label, Book>,
+    pub books: HashMap<Label, Book>,
+    r:         Retriever,
 }
 
 impl Library {
-    pub fn add_book(&mut self, bn: Label, b: Book) -> Option<Book> {
-        self.books.insert(bn, b)
+    pub async fn from_url(&mut self, url: String) -> Option<Book> {
+        let page = url.into();
+        let book = self.r.book(page).await;
+        self.books.insert(book.title.clone(), book)
+    }
+
+    pub fn rename_book(&mut self, idx: &Label, name: String) {
+        match self.books.remove(idx) {
+            Some(mut b) => {
+                b.title = name.clone().into();
+                self.books.insert(name.into(), b)
+            }
+            None => todo!(),
+        };
     }
 }

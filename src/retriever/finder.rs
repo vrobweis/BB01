@@ -47,7 +47,7 @@ pub trait Finder: des + ser {
     }
     /// Returns the biggest congregation of links in the html
     #[inline]
-    fn index_def(&self) -> Box<dyn Fn(Doc) -> Option<Vec<String>>> {
+    fn chaps_def(&self) -> Box<dyn Fn(Doc) -> Option<Vec<String>>> {
         Box::new(|doc: Doc| {
             doc.as_ref().map(|a: &Document| {
                 a.select(Descendant(
@@ -148,7 +148,7 @@ pub trait Finder {
     }
     /// Returns the biggest congregation of links in the html
     #[inline]
-    fn index_def(&self) -> Box<dyn Fn(Doc) -> Option<Vec<String>>> {
+    fn chaps_def(&self) -> Box<dyn Fn(Doc) -> Option<Vec<String>>> {
         Box::new(|doc: Doc| {
             doc.as_ref().map(|a: &Document| {
                 a.select(Descendant(
@@ -215,9 +215,9 @@ pub trait Get: Finder {
     #[inline]
     fn text(&self) -> Option<Vec<String>> { self.text_def()(self.doc()) }
     #[inline]
-    fn index(&self) -> Option<Vec<String>> { self.index_def()(self.doc()) }
+    fn chaps(&self) -> Option<Vec<String>> { self.chaps_def()(self.doc()) }
     #[inline]
-    fn image(&self) -> Option<Vec<String>> { self.images_def()(self.doc()) }
+    fn images(&self) -> Option<Vec<String>> { self.images_def()(self.doc()) }
     #[inline]
     fn title(&self) -> Label { self.title_def()(self.doc()) }
 }

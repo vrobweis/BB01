@@ -1,5 +1,6 @@
 use crate::{Finder, Get};
 use chrono::{DateTime, Duration, Utc};
+use core::slice::SlicePattern;
 use reqwest::{Client, Request, Url};
 use select::{
     document::Document,
@@ -43,13 +44,17 @@ pub struct Page {
 
 impl Page {
     /// Loads the html and parsed html in Page preparation for future actions
-    pub async fn refresh(&self, client: &Client) -> Result<&Self, &Self> {
+    pub async fn refresh(&self, client: Option<&Client>) -> Result<&Self, &Self> {
         if self.doc.borrow().is_none() {
             self.full.set(false);
         };
         if let Some(rq) = self.req.borrow().as_ref() {
             // TODO: Better error recovery with a failures counter in Retriever
-            let resp = client.execute(rq.try_clone().unwrap()).await.unwrap();
+            let resp = client
+                .unwrap_or(&Client::new())
+                .execute(rq.try_clone().unwrap())
+                .await
+                .unwrap();
             let html = resp.text().await.unwrap().to_owned();
             self.doc.replace(Some(html.as_str().into()));
             self.html.replace(Some(html));
@@ -90,13 +95,15 @@ impl Page {
                 .next()
         });
         match s {
-            Some(s) => Some(s.refresh(client).await.unwrap().to_owned()),
+            Some(s) => Some(s.refresh(Some(client)).await.unwrap().to_owned()),
             None => None,
         }
     }
 
     /// Returns a Page leading the the index page of the chapter
     pub fn index(&self) -> Result<Self, url::ParseError> {
+        // TODO: Alternatively, find links up or left from other links leading to
+        // the current page
         let base = self.loc.origin().ascii_serialization();
         let mut index = self
             .loc
@@ -122,7 +129,7 @@ impl Page {
             .map(|&a| a)
             .collect::<Vec<_>>()
             .join("/")
-            .parse::<Page>()
+            .parse()
     }
 
     pub fn get_place(&self) -> (u16, u16, String) {
@@ -157,6 +164,44 @@ impl Page {
             ([], Some(z)) => (0, 0, z.to_string()),
             _ => (0, 0, "".to_string()),
         }
+    }
+
+    pub fn get_content(&self, visual: bool) -> Option<Vec<String>> {
+        match visual {
+            true => self.images(),
+            false => self.text(),
+        }
+    }
+
+    pub async fn get_image(&self, client: Option<&Client>) -> Vec<u8> {
+        if self.req.borrow().is_none() {
+            return Default::default();
+        }
+        client
+            .to_owned()
+            .unwrap()
+            .execute(self.req.borrow().as_ref().unwrap().try_clone().unwrap())
+            .await
+            .unwrap()
+            .bytes()
+            .await
+            .unwrap()
+            .as_slice()
+            .to_owned()
+    }
+
+    pub fn check_visual(&self) -> Option<bool> {
+        let t = vec!["novel", "royalroad", "comrademao"];
+        let p = vec!["manga", "scans", "hentai", "pururin", "luscious"];
+        let f = |s: &&str| -> bool {
+            self.loc.origin().ascii_serialization().contains(s)
+        };
+        Some(match (t.iter().any(|s| f(s)), p.iter().any(|s| f(s))) {
+            (true, true) => self.text().unwrap().len() < 20,
+            (true, false) => false,
+            (false, true) => true,
+            (false, false) => self.text().unwrap().len() < 20,
+        })
     }
 
     pub fn is_old(&self, d: Option<Duration>) -> bool {
@@ -213,7 +258,7 @@ impl Hash for Page {
     }
 }
 impl<T: Into<String>> From<T> for Page {
-    fn from(src: T) -> Self { (&src.into()).parse().unwrap() }
+    fn from(src: T) -> Self { src.into().parse::<Self>().unwrap().to_owned() }
 }
 impl FromStr for Page {
     type Err = url::ParseError;

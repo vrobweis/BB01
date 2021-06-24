@@ -35,7 +35,7 @@ serde_traitobject = { version = "0.2.7", optional = true }
 serde_with = { version = "1.9.4", features = ["macros"] }
 
 chrono = { version = "0.4.19", features = ["serde"] }
-# futures = "0.3.15"
+futures = "0.3.15"
 # tokio_schedule = "0.3.0" # https://docs.rs/tokio_schedule/0.3.0/tokio_schedule/
 
 [dependencies.tokio]
@@ -45,7 +45,7 @@ version = "1.7.1"
 default-features = false
 version = "0.120.0"
 [dependencies.pistoncore-sdl2_window]
-git = "https://github.com/PistonDevelopers/sdl2_window"
+git = "https://github.com/simdimdim/sdl2_window"
 
 [target.'cfg(not(target_os = "linux"))'.dependencies.sdl2]
 features = ["bundled", "use-vcpkg"]
