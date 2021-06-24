@@ -1,171 +1,103 @@
-#![allow(unused_imports)]
-
-use conrod_core::{text::rt::Rect, Scalar};
-use conrod_example_shared as example;
-use conrod_piston::{draw::primitives as draw_primitives, event::convert};
-use example::DemoApp;
-use pagepal::{fullscreen, library::Library, theme};
-use piston_window::{
-    texture::{Format::Rgba8, UpdateTexture},
-    AdvancedWindow,
-    Button,
-    EventLoop,
-    Flip,
-    G2d,
-    G2dTexture,
-    Key,
-    OpenGL,
-    PistonWindow,
-    PressEvent,
-    ResizeEvent,
-    Size,
-    Texture,
-    TextureSettings,
-    UpdateEvent,
-    Window,
-    WindowSettings,
+use druid::piet::InterpolationMode;
+use druid::text::format::ParseFormatter;
+use druid::widget::{prelude::*, FillStrat, Image};
+use druid::widget::{
+    Checkbox, CrossAxisAlignment, Flex, Label, RadioGroup, SizedBox, TextBox, WidgetExt,
 };
-use sdl2_window::Sdl2Window;
-use std::path::PathBuf;
+use druid::{AppLauncher, Color, Data, ImageBuf, Lens, LensExt, WindowDesc};
 
-pub fn main() {
-    // #[tokio::main]
-    // pub async fn main() {
-    let gl = OpenGL::V4_5;
-    const WIDTH: u32 = example::WIN_W;
-    const HEIGHT: u32 = example::WIN_H;
-    let assets = PathBuf::from("assets");
-    let font_path = assets.join("NotoSans-Regular.ttf");
-    let _library = Library::default();
 
-    let mut window: PistonWindow<Sdl2Window> =
-        WindowSettings::new("Pagepal conrod testing", [WIDTH, HEIGHT])
-            .samples(16)
-            .exit_on_esc(true)
-            .vsync(true)
-            .resizable(true)
-            .graphics_api(gl)
-            .build()
-            .expect("You encountered this error");
-    window.set_capture_cursor(false);
-    window.set_max_fps(120);
-    window.set_ups(60);
+#[derive(Clone, Data, Lens)]
+struct AppData {
+    state: u32 //replace with state enum
+}
 
-    let mut ui = conrod_core::UiBuilder::new([WIDTH as f64, HEIGHT as f64])
-        .theme(theme())
-        .build();
-    ui.fonts.insert_from_file(font_path).unwrap();
 
-    let mut ctx = window.create_texture_context();
 
-    // Create a texture to use for efficiently caching text on the GPU.
-    let mut text_vertex_data = Vec::new();
-    let (mut glyph_cache, mut text_texture_cache) = {
-        const SCALE_TOLERANCE: f32 = 0.1;
-        const POSITION_TOLERANCE: f32 = 0.1;
-        let cache = conrod_core::text::GlyphCache::builder()
-            .dimensions(WIDTH, HEIGHT)
-            .scale_tolerance(SCALE_TOLERANCE)
-            .position_tolerance(POSITION_TOLERANCE)
-            .build();
-        let buffer_len = WIDTH as usize * HEIGHT as usize;
-        let init = vec![128; buffer_len];
-        let settings = TextureSettings::new();
-        let texture = G2dTexture::from_memory_alpha(
-            &mut ctx, &init, WIDTH, HEIGHT, &settings,
-        )
-        .unwrap();
-        (cache, texture)
-    };
+/// builds a child Flex widget from some paramaters.
+struct Rebuilder {
+    inner: Box<dyn Widget<AppData>>,
+}
 
-    // Instantiate the generated list of widget identifiers.
-    let ids = example::Ids::new(ui.widget_id_generator());
-
-    // Load the rust logo from file to a piston_window texture.
-    let rust_logo: G2dTexture = {
-        let path = assets.join("images/rust.png");
-        let settings = TextureSettings::new();
-        Texture::from_path(&mut ctx, &path, Flip::None, &settings).unwrap()
-    };
-
-    // Create our `conrod_core::image::Map` which describes each of our
-    // widget->image mappings.
-    let mut image_map = conrod_core::image::Map::new();
-    let rust_logo = image_map.insert(rust_logo);
-
-    // A demonstration of some state that we'd like to control with the App.
-    let mut app = DemoApp::new(rust_logo);
-
-    while let Some(e) = window.next() {
-        // Convert the src event to a conrod event.
-        let size = window.size();
-        let (win_w, win_h) = (size.width as Scalar, size.height as Scalar);
-        if let Some(e) = convert(e.clone(), win_w, win_h) {
-            ui.handle_event(e);
+impl Rebuilder {
+    fn new() -> Rebuilder {
+        Rebuilder {
+            inner: SizedBox::empty().boxed(),
         }
+    }
 
-        e.update(|_| {
-            let mut ui = ui.set_widgets();
-            example::gui(&mut ui, &ids, &mut app);
-        });
-
-        window.draw_2d(&e, |context, graphics, device| {
-            if let Some(prim) = ui.draw_if_changed() {
-                // A function used for caching glyphs to the texture cache.
-                let cache_queued_glyphs =
-                    |_graphics: &mut G2d,
-                     cache: &mut G2dTexture,
-                     rect: Rect<u32>,
-                     data: &[u8]| {
-                        let offset = [rect.min.x, rect.min.y];
-                        let size = [rect.width(), rect.height()];
-                        let format = Rgba8;
-                        text_vertex_data.clear();
-                        text_vertex_data.extend(
-                            data.iter().flat_map(|&b| vec![255, 255, 255, b]),
-                        );
-                        UpdateTexture::update(
-                            cache,
-                            &mut ctx,
-                            format,
-                            &text_vertex_data[..],
-                            offset,
-                            size,
-                        )
-                        .expect("failed to update texture")
-                    };
-
-                // Draw the conrod `render::Primitives`.
-                draw_primitives(
-                    prim,
-                    context,
-                    graphics,
-                    &mut text_texture_cache,
-                    &mut glyph_cache,
-                    &image_map,
-                    cache_queued_glyphs,
-                    texture_from_image,
-                );
-
-                ctx.encoder.flush(device);
-            }
-        });
-        if let Some(button) = e.press_args() {
-            if let Button::Keyboard(key) = button {
-                match key {
-                    Key::R => println!("{}", "This"),
-                    Key::Q => break,
-                    Key::F | Key::F12 => {
-                        fullscreen(&mut window);
-                        ui.needs_redraw()
-                    }
-                    _ => {}
-                }
-            }
-        }
+    fn rebuild_inner(&mut self, data: &AppData) {
+        self.inner = build_widget(&data);
     }
 }
 
-/// Specify how to get the drawable texture from the image.
-/// In this case, the image *is* the texture.
-fn texture_from_image<T>(img: &T) -> &T { img }
+impl Widget<AppData> for Rebuilder {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppData, env: &Env) {
+        self.inner.event(ctx, event, data, env)
+    }
+
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &AppData, env: &Env) {
+        if let LifeCycle::WidgetAdded = event {
+            self.rebuild_inner(data);
+        }
+        self.inner.lifecycle(ctx, event, data, env)
+    }
+
+    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &AppData, data: &AppData, _env: &Env) {
+        if !old_data.same(&data) {
+            self.rebuild_inner(data);
+            ctx.children_changed();
+        }
+    }
+
+    fn layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &BoxConstraints,
+        data: &AppData,
+        env: &Env,
+    ) -> Size {
+        self.inner.layout(ctx, bc, data, env)
+    }
+
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &AppData, env: &Env) {
+        self.inner.paint(ctx, data, env)
+    }
+
+    fn id(&self) -> Option<WidgetId> {
+        self.inner.id()
+    }
+}
+
+
+
+fn build_widget(state: &AppData) -> Box<dyn Widget<AppData>> {
+    let png_data = //ImageBuf::from_raw(include_bytes!("./assets/PicWithAlpha.png"), ImageFormat::Rgb).unwrap();
+        ImageBuf::empty(); // TODO: Use real buffer for sample work
+    let mut img = Image::new(png_data).fill_mode(FillStrat::Fill);
+    let mut sized = SizedBox::new(img);
+    sized.border(Color::grey(0.6), 2.0).center().boxed()
+}
+
+fn make_ui() -> impl Widget<AppData> {
+    Flex::column()
+        .must_fill_main_axis(true)
+        .with_default_spacer()
+        .with_flex_child(Rebuilder::new().center(), 1.0)
+        .padding(10.0)
+}
+
+pub fn main() {
+    let main_window = WindowDesc::new(make_ui)
+        .window_size((650., 450.))
+        .title("Flex Container Options");
+
+    let state = AppData {
+        state: 3
+    };
+
+    AppLauncher::with_window(main_window)
+        .use_simple_logger()
+        .launch(state)
+        .expect("Failed to launch application");
+}

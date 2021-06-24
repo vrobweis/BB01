@@ -16,10 +16,8 @@ git = "https://github.com/microsoft/vcpkg"
 target = {x86_64-pc-windows-msvc = {triplet = "x64-windows-static-md"}}
 
 [dependencies]
-conrod = "0.62.1"
-conrod_core = {git = "https://github.com/simdimdim/conrod"}
-conrod_example_shared = {git = "https://github.com/simdimdim/conrod"}
-conrod_piston = {git = "https://github.com/simdimdim/conrod"}
+druid = "0.7.0"
+image = "0.23.14"
 
 # hentai = "0.2.2"
 directories-next = "2.0.0"
@@ -41,17 +39,7 @@ chrono = { version = "0.4.19", features = ["serde"] }
 [dependencies.tokio]
 features = ["fs", "time", "net", "macros", "rt-multi-thread"]
 version = "1.7.1"
-[dependencies.piston_window]
-default-features = false
-version = "0.120.0"
-[dependencies.pistoncore-sdl2_window]
-git = "https://github.com/PistonDevelopers/sdl2_window"
 
-[target.'cfg(not(target_os = "linux"))'.dependencies.sdl2]
-features = ["bundled", "use-vcpkg"]
-version = "0.34.5"
-[target.'cfg(target_os = "linux")'.dependencies]
-sdl2 = "0.34.5"
 
 [features]
 default = []

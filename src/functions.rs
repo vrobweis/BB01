@@ -1,7 +1,11 @@
 use chrono::Duration;
+#[cfg(conrod_core)]
 use conrod_core::Theme;
+#[cfg(piston_window)]
 use piston_window::PistonWindow;
+#[cfg(sdl2)]
 use sdl2::video::FullscreenType;
+#[cfg(sdl2_window)]
 use sdl2_window::Sdl2Window;
 use std::path::PathBuf;
 
@@ -19,6 +23,7 @@ trait Store {
     }
 }
 #[inline]
+#[cfg(conrod_core)]
 pub fn theme() -> Theme {
     use conrod_core::position::{Align, Direction, Padding, Position, Relative};
     conrod_core::Theme {
@@ -47,6 +52,7 @@ pub fn theme() -> Theme {
     }
 }
 #[inline]
+#[cfg(all(piston_window, sdl2_window))]
 pub fn fullscreen(window: &mut PistonWindow<Sdl2Window>) {
     match window.window.window.fullscreen_state() {
         FullscreenType::Off => {
