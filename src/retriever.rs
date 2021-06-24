@@ -1,5 +1,6 @@
 use self::delay::Delay;
-use crate::Label;
+use crate::{Book, Content};
+use futures::future::join_all;
 use reqwest::Client;
 use serde::{Deserialize as des, Serialize as ser};
 #[cfg(feature = "trait_ojb_ser")] use serde_traitobject as s;
@@ -39,15 +40,87 @@ pub struct Retriever {
     client:  Client,
     #[serde(skip)]
     sites:   Arc<Mutex<HashMap<Host, Delay>>>,
-    #[serde(skip)]
-    cntmap:  Arc<HashMap<Label, Page>>,
     #[cfg(feature = "trait_ojb_ser")]
     #[serde_as(as = "Vec<(_, _)>")]
     finders: BTreeMap<Host, FindWrap>,
     //add new fields to the Debug impl
 }
 impl Retriever {
-    pub async fn dl(&self, p: Page) -> Result<Page, ParseError> {
+    pub async fn book(&self, page: Page) -> Book {
+        let index = self.dl(&page).await.unwrap().index().unwrap();
+        let title = index.title().to_owned();
+        let visual = index.check_visual().unwrap_or_default().to_owned();
+        let chapters = self.chapters(&index).await;
+        let content = match chapters {
+            Some(c) => self.contents(&c, visual).await,
+            None => vec![],
+        };
+
+        let mut b = Book {
+            title,
+            index,
+            visual,
+            ..Default::default()
+        };
+        for c in content {
+            let place = c.src.as_ref().unwrap().get_place();
+            b.content
+                .insert(crate::Num(place.1, Some(place.0 as u8)), c);
+        }
+        b
+    }
+
+    /// generate a vec with contents for every page
+    pub async fn contents(
+        &self, pages: &Vec<Page>, visual: bool,
+    ) -> Vec<Content> {
+        let res = pages.iter().map(|p| p.get_content(visual));
+        match visual {
+            true => {
+                join_all(
+                    res.map(|s| {
+                        s.unwrap().iter().map(Page::from).collect::<Vec<_>>()
+                    })
+                    .flatten()
+                    .map(|p| async move {
+                        p.refresh(Some(&self.client)).await.unwrap().into()
+                    }),
+                )
+                .await
+            }
+            false => res.map(|a| Content::from(a.unwrap().join(""))).collect(),
+        }
+    }
+
+    pub async fn content(&self, page: &Page, visual: bool) -> Vec<Content> {
+        let res = page
+            .refresh(Some(&self.client))
+            .await
+            .unwrap()
+            .get_content(visual);
+        match visual {
+            true => {
+                join_all(res.unwrap().iter().map(Page::from).map(
+                    |p| async move {
+                        p.refresh(Some(&self.client)).await.unwrap().into()
+                    },
+                ))
+                .await
+            }
+            false => vec![Content::from(res.unwrap().join(""))],
+        }
+    }
+
+    pub async fn chapters(&self, p: &Page) -> Option<Vec<Page>> {
+        Some(
+            join_all(p.chaps().unwrap().iter().cloned().map(|a| async {
+                self.dl(&Page::from(a)).await.unwrap().to_owned()
+            }))
+            .await,
+        )
+    }
+
+    pub async fn dl(&self, p: &Page) -> Result<Page, ParseError> {
         if p.is_old(None) {
             self.access(&p).await;
         }
@@ -64,15 +137,11 @@ impl Retriever {
                 .build()
                 .unwrap(),
         )
-        .refresh(&self.client)
+        .refresh(Some(&self.client))
         .await
         .unwrap();
-        Ok(p)
+        Ok(p.to_owned())
     }
-
-    pub async fn get_cnt(&self) { self.cntmap.clone().get(&Label::default()); }
-
-    pub async fn get_page(&self, p: Page) -> Result<Page, Page> { Ok(p) }
 
     /// Keeps track of domains being accessed and adds delay between accessed
     async fn access(&self, p: &Page) {
@@ -94,7 +163,6 @@ impl Debug for Retriever {
             .field("headers", &self.headers)
             .field("client", &self.client)
             .field("sites", &self.sites)
-            .field("cntmap", &self.cntmap)
             .finish()
     }
 }
