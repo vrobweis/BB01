@@ -1,4 +1,4 @@
-use crate::{BookSource, Chapter, Num};
+use crate::{BookSource, Chapter, Content, Num};
 use serde::{Deserialize as des, Serialize as ser};
 use serde_with::serde_as;
 use std::collections::BTreeMap;
@@ -6,17 +6,21 @@ use std::collections::BTreeMap;
 #[serde_as]
 #[derive(Clone, Default, Debug, ser, des)]
 pub struct Book {
-    bs:     BookSource,
-    visual: bool,
+    bs:      BookSource,
+    visual:  bool,
     #[serde_as(as = "Vec<(_, _)>")]
-    chs:    BTreeMap<Num, Chapter>,
-    pos:    u32,
+    chs:     BTreeMap<u16, Chapter>,
+    #[serde_as(as = "Vec<(_, _)>")]
+    content: BTreeMap<Num, Content>,
+    pos:     u32,
 }
 
 impl Eq for Book {}
 impl PartialEq for Book {
     fn eq(&self, other: &Self) -> bool {
-        self.bs == other.bs && self.visual == other.visual
+        self.bs == other.bs &&
+            self.visual == other.visual &&
+            self.content == other.content
     }
 }
 // impl Book {

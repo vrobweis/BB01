@@ -2,8 +2,9 @@ use self::delay::Delay;
 use crate::Label;
 use reqwest::Client;
 use serde::{Deserialize as des, Serialize as ser};
-use serde_traitobject as s;
+#[cfg(feature = "trait_ojb_ser")] use serde_traitobject as s;
 use serde_with::serde_as;
+#[cfg(feature = "trait_ojb_ser")] use std::rc::Rc;
 use std::{
     collections::{
         hash_map::Entry::{Occupied, Vacant},
@@ -11,7 +12,6 @@ use std::{
         HashMap,
     },
     fmt::Debug,
-    rc::Rc,
     string::ParseError,
     sync::Arc,
 };
@@ -24,10 +24,11 @@ pub mod headers;
 pub mod page;
 
 pub use self::{finder::*, headers::*, page::*};
-
 #[derive(Clone, Default, ser, des)]
 pub struct FindWrap(
-    #[serde(with = "serde_traitobject")] pub Rc<Option<s::Box<dyn Finder>>>,
+    #[cfg(feature = "trait_ojb_ser")]
+    #[serde(with = "serde_traitobject")]
+    pub Rc<Option<s::Box<dyn Finder>>>,
 );
 
 #[serde_as]
@@ -40,6 +41,7 @@ pub struct Retriever {
     sites:   Arc<Mutex<HashMap<Host, Delay>>>,
     #[serde(skip)]
     cntmap:  Arc<HashMap<Label, Page>>,
+    #[cfg(feature = "trait_ojb_ser")]
     #[serde_as(as = "Vec<(_, _)>")]
     finders: BTreeMap<Host, FindWrap>,
     //add new fields to the Debug impl

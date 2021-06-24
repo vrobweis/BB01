@@ -163,6 +163,12 @@ impl Page {
         (self.last + d.unwrap_or(Duration::seconds(10))) < Utc::now() ||
             self.full.get()
     }
+
+    pub fn empty(&self) {
+        self.html.replace(Default::default());
+        self.doc.replace(Default::default());
+        self.full.set(false);
+    }
 }
 
 impl Finder for Page {}

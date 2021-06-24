@@ -31,7 +31,7 @@ url = { version = "2.2.2", features = ["serde"] }
 http-serde = "1.0.2"
 serde = { version = "1.0.126", features = ["derive"] }
 # serde_json = "1.0.64"
-serde_traitobject = "0.2.7"
+serde_traitobject = { version = "0.2.7", optional = true }
 serde_with = { version = "1.9.4", features = ["macros"] }
 
 chrono = { version = "0.4.19", features = ["serde"] }
@@ -52,3 +52,7 @@ features = ["bundled", "use-vcpkg"]
 version = "0.34.5"
 [target.'cfg(target_os = "linux")'.dependencies]
 sdl2 = "0.34.5"
+
+[features]
+default = []
+trait_ojb_ser = ["serde_traitobject"]

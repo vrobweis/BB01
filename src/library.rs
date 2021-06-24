@@ -1,6 +1,6 @@
 use serde::{Deserialize as des, Serialize as ser};
 use serde_with::serde_as;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 pub mod book;
 pub mod chapter;
@@ -13,9 +13,7 @@ pub(crate) use self::{book::*, chapter::*, content::*, internals::*};
 #[derive(Default, Debug, Clone, ser, des)]
 pub struct Library {
     #[serde_as(as = "Vec<(_, _)>")]
-    books:    HashMap<Label, Book>,
-    #[serde_as(as = "Vec<(_, _)>")]
-    chapters: BTreeMap<(Label, u16), Chapter>,
+    books: HashMap<Label, Book>,
 }
 
 impl Library {

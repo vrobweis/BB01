@@ -2,15 +2,22 @@ use crate::Page;
 use serde::{Deserialize as des, Serialize as ser};
 use std::cmp::Ordering::{self, Equal, Greater, Less};
 
-#[derive(Debug, PartialEq, Eq, Clone, ser, des)]
+#[derive(Debug, Clone, Eq, PartialEq, ser, des)]
 pub struct Num(pub u16, pub Option<u8>);
-#[derive(Clone, Default, Debug, ser, des)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, ser, des)]
 pub struct Content {
     pub id: u64,
     src:    Option<Page>,
     data:   Option<String>,
 }
 impl Content {
+    pub fn lighten(&self) {
+        match &self.src {
+            Some(p) => p.empty(),
+            None => todo!(),
+        }
+    }
+
     pub fn data(&self) -> &[u8] {
         self.data.as_ref().map(String::as_bytes).unwrap_or(&[])
     }
