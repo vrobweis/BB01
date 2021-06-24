@@ -14,8 +14,8 @@ pub(crate) use self::{book::*, chapter::*, content::*};
 #[derive(Default, Debug, Clone, ser, des)]
 pub struct Library {
     #[serde_as(as = "Vec<(_, _)>")]
-    books: HashMap<Label, Book>,
-    r:     Retriever,
+    pub books: HashMap<Label, Book>,
+    r:         Retriever,
 }
 
 impl Library {

@@ -48,6 +48,7 @@ pub struct Retriever {
 impl Retriever {
     pub async fn book(&self, page: Page) -> Book {
         let index = self.dl(&page).await.unwrap().index().unwrap();
+        self.dl(&index).await.unwrap();
         let title = index.title().to_owned();
         let visual = index.check_visual().unwrap_or_default().to_owned();
         let chapters = self.chapters(&index).await;
@@ -56,40 +57,41 @@ impl Retriever {
             None => vec![],
         };
 
-        let mut b = Book {
+        let mut bk = Book {
             title,
             index,
             visual,
             ..Default::default()
         };
-        for c in content {
-            let place = c.src.as_ref().unwrap().get_place();
-            b.content
-                .insert(crate::Num(place.1, Some(place.0 as u8)), c);
-        }
-        b
+        content.iter().for_each(|a| {
+            a.iter().for_each(|b| {
+                let place = b.src.as_ref().unwrap().get_place();
+                bk.content.insert(
+                    crate::Num(place.1, Some(place.0 as u8)),
+                    b.to_owned(),
+                );
+            })
+        });
+        bk
     }
 
     /// generate a vec with contents for every page
     pub async fn contents(
         &self, pages: &Vec<Page>, visual: bool,
-    ) -> Vec<Content> {
-        let res = pages.iter().map(|p| p.get_content(visual));
-        match visual {
-            true => {
-                join_all(
-                    res.map(|s| {
-                        s.unwrap().iter().map(Page::from).collect::<Vec<_>>()
-                    })
-                    .flatten()
-                    .map(|p| async move {
-                        p.refresh(Some(&self.client)).await.unwrap().into()
-                    }),
-                )
-                .await
+    ) -> Vec<Vec<Content>> {
+        join_all(pages.iter().map(|p1| async move {
+            let res = self.dl(p1).await.unwrap().get_content(visual).unwrap();
+            match visual {
+                true => {
+                    join_all(res.iter().map(Page::from).map(|p2| async move {
+                        self.dl(&p2).await.unwrap().into()
+                    }))
+                    .await
+                }
+                false => vec![Content::from(res.join(""))],
             }
-            false => res.map(|a| Content::from(a.unwrap().join(""))).collect(),
-        }
+        }))
+        .await
     }
 
     pub async fn content(&self, page: &Page, visual: bool) -> Vec<Content> {
