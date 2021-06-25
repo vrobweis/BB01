@@ -1,24 +1,24 @@
-trait ID: Sized + PartialEq + Eq + PartialOrd + Ord {}
+pub(crate) trait Id: Sized + PartialEq + Eq + PartialOrd + Ord {}
 
-impl<T> ID for T where T: Sized + PartialEq + Eq + PartialOrd + Ord {}
+impl<T> Id for T where T: Sized + PartialEq + Eq + PartialOrd + Ord {}
 
-trait CompositeID<T, U>: ID where T: ID, U: ID {
+pub(crate) trait CompositeId<T, U>: Id where T: Id, U: Id {
     fn new(id1: T, id2: U) -> Self;
 
     fn get_first(&self) -> T;
     fn get_second(&self) -> U;
 }
 
-type BookIDType = u8;
-type ChapterIDType = u16;
-type ContentIDType = u32;
+type BookIdType = u8;
+type ChapterIdType = u16;
+type ContentIdType = u32;
 
 
 #[test]
 fn test_id_properties() {
-    let book: BookID = BookID::new(3);
-    let chapter: ChapterID = ChapterID::new(book.clone(), 7);
-    let content: ContentID = ContentID::new(chapter.clone(), 12);
+    let book: BookId = BookId::new(3);
+    let chapter: ChapterId = ChapterId::new(book.clone(), 7);
+    let content: ContentId = ContentId::new(chapter.clone(), 12);
 
     assert_eq!(content.get_book_id(), book);
     assert_eq!(content.get_chapter_id(), chapter.clone());
@@ -28,65 +28,65 @@ fn test_id_properties() {
 
 #[repr(transparent)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct BookID(BookIDType);
+pub struct BookId(BookIdType);
 
-impl BookID {
-    pub fn new(id_value: BookIDType) -> Self {
+impl BookId {
+    pub fn new(id_value: BookIdType) -> Self {
         Self(id_value)
     }
 }
 
 #[repr(transparent)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct ChapterID(ChapterIDType);
+pub struct ChapterId(ChapterIdType);
 
 #[repr(transparent)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct ContentID(u32);
+pub struct ContentId(u32);
 
-impl ChapterID {
-    fn get_book_id(&self) -> BookID {
+impl ChapterId {
+    fn get_book_id(&self) -> BookId {
         self.get_first()
     }
 }
 
-impl ContentID {
-    fn get_chapter_id(&self) -> ChapterID {
+impl ContentId {
+    fn get_chapter_id(&self) -> ChapterId {
         self.get_first()
     }
 
-    fn get_book_id(&self) -> BookID {
+    fn get_book_id(&self) -> BookId {
         self.get_chapter_id().get_book_id()
     }
 }
 
 
-impl From<BookIDType> for BookID {
-    fn from(num: BookIDType) -> Self {
-        BookID(num)
+impl From<BookIdType> for BookId {
+    fn from(num: BookIdType) -> Self {
+        BookId(num)
     }
 }
 
-impl From<ChapterIDType> for ChapterID {
-    fn from(num: ChapterIDType) -> Self {
-        ChapterID(num)
+impl From<ChapterIdType> for ChapterId {
+    fn from(num: ChapterIdType) -> Self {
+        ChapterId(num)
     }
 }
 
-impl From<ContentIDType> for ContentID {
-    fn from(num: ContentIDType) -> Self {
-        ContentID(num)
+impl From<ContentIdType> for ContentId {
+    fn from(num: ContentIdType) -> Self {
+        ContentId(num)
     }
 }
 
 
-impl CompositeID<BookID, u8> for ChapterID {
-    fn new(id1: BookID, id2: u8) -> Self {
+impl CompositeId<BookId, u8> for ChapterId {
+    fn new(id1: BookId, id2: u8) -> Self {
         Self( (((*id1) as u16) << 8) as u16 + (id2 as u16) )
     }
 
-    fn get_first(&self) -> BookID {
-        BookID(((self.0 & 0xFF00) >> 8) as u8)
+    fn get_first(&self) -> BookId {
+        BookId(((self.0 & 0xFF00) >> 8) as u8)
     }
 
     fn get_second(&self) -> u8 {
@@ -94,13 +94,13 @@ impl CompositeID<BookID, u8> for ChapterID {
     }
 }
 
-impl CompositeID<ChapterID, u16> for ContentID {
-    fn new(id1: ChapterID, id2: u16) -> Self {
+impl CompositeId<ChapterId, u16> for ContentId {
+    fn new(id1: ChapterId, id2: u16) -> Self {
         Self( (((*id1) as u32) << 16) as u32 + (id2 as u32) )
     }
 
-    fn get_first(&self) -> ChapterID {
-        ChapterID(((self.0 & 0xFFFF0000) >> 16) as u16)
+    fn get_first(&self) -> ChapterId {
+        ChapterId(((self.0 & 0xFFFF0000) >> 16) as u16)
     }
 
     fn get_second(&self) -> u16 {
@@ -111,24 +111,24 @@ impl CompositeID<ChapterID, u16> for ContentID {
 
 use std::ops::Deref;
 
-impl Deref for BookID {
-    type Target = BookIDType;
+impl Deref for BookId {
+    type Target = BookIdType;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl Deref for ChapterID {
-    type Target = ChapterIDType;
+impl Deref for ChapterId {
+    type Target = ChapterIdType;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl Deref for ContentID {
-    type Target = ContentIDType;
+impl Deref for ContentId {
+    type Target = ContentIdType;
 
     fn deref(&self) -> &Self::Target {
         &self.0

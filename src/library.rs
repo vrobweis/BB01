@@ -6,7 +6,7 @@ use std::collections::HashMap;
 pub mod book;
 pub mod chapter;
 pub mod content;
-pub mod id;
+pub mod identifiers;
 
 pub(crate) use self::{book::*, chapter::*, content::*};
 

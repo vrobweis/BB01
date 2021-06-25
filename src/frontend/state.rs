@@ -1,7 +1,8 @@
-use crate::{Chapter, Content};
+use crate::{identifiers::*};
 
 
-enum AppState {
+#[derive(Debug, Clone)]
+pub enum AppState {
     Starting,
 
     StartMenu,
@@ -17,6 +18,6 @@ enum AppState {
     Search,
     SelectChapter,
 
-    Read { chapter: Chapter, current_content: Content }
+    Read { current_content: ContentId }
 
 }

@@ -4,6 +4,8 @@ pub mod functions;
 pub mod library;
 pub mod retriever;
 
+pub mod frontend;
+
 pub use self::{functions::*, library::*, retriever::*};
 
 #[tokio::test]
