@@ -19,6 +19,18 @@ pub struct Book {
     pub pos:     u32,
 }
 
+impl Book {
+    pub fn contents(&self) -> Vec<Content> {
+        self.content
+            .values()
+            .map(|a| {
+                a.src.as_ref().unwrap().empty();
+                a.to_owned()
+            })
+            .collect::<Vec<Content>>()
+    }
+}
+
 impl Eq for Book {}
 impl PartialEq for Book {
     fn eq(&self, other: &Self) -> bool {
@@ -30,7 +42,6 @@ impl PartialEq for Book {
 impl Default for Label {
     fn default() -> Self { Self(thread_rng_n(1234567890).to_string()) }
 }
-
 impl From<String> for Label {
     fn from(s: String) -> Self { Label(s) }
 }

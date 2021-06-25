@@ -3,14 +3,15 @@ use conrod_core::Theme;
 use piston_window::PistonWindow;
 use sdl2::video::FullscreenType;
 use sdl2_window::Sdl2Window;
+use serde::{Deserialize as des, Serialize as ser};
 use std::path::PathBuf;
 
-trait Store {
+pub trait Store<'a>: ser + des<'a> {
     fn name(&self) -> String;
-    fn location(&self) -> PathBuf { PathBuf::from(self.name()) }
+    fn loc(&self) -> PathBuf { PathBuf::from(self.name()) }
     fn loc1(_: (&Self, String)) -> (Self, String)
     where
-        Self: Store + Sized;
+        Self: Store<'a> + Sized;
     fn save(&self);
     fn load() -> Self
     where
@@ -18,6 +19,7 @@ trait Store {
         Self::default()
     }
 }
+
 #[inline]
 pub fn theme() -> Theme {
     use conrod_core::position::{Align, Direction, Padding, Position, Relative};
@@ -61,4 +63,4 @@ pub fn fullscreen(window: &mut PistonWindow<Sdl2Window>) {
     };
 }
 #[inline]
-pub fn duration() -> Duration { Duration::seconds(2) }
+pub fn duration() -> Duration { Duration::seconds(1) }

@@ -7,7 +7,7 @@ impl Default for Delay {
 #[derive(Clone, Debug)]
 pub struct Delay(pub Instant);
 impl Delay {
-    pub async fn delay(&mut self, delay: Duration) {
+    pub async fn delay_if(&mut self, delay: Duration) {
         let until = self.0 + delay.to_std().unwrap();
         if until > Instant::now() {
             sleep_until(until).await;

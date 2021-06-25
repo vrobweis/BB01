@@ -1,6 +1,5 @@
 use crate::{Finder, Get};
 use chrono::{DateTime, Duration, Utc};
-use core::slice::SlicePattern;
 use reqwest::{Client, Request, Url};
 use select::{
     document::Document,
@@ -186,8 +185,7 @@ impl Page {
             .bytes()
             .await
             .unwrap()
-            .as_slice()
-            .to_owned()
+            .to_vec()
     }
 
     pub fn check_visual(&self) -> Option<bool> {
@@ -206,7 +204,7 @@ impl Page {
 
     pub fn is_old(&self, d: Option<Duration>) -> bool {
         (self.last + d.unwrap_or(Duration::seconds(10))) < Utc::now() ||
-            self.full.get()
+            !self.full.get()
     }
 
     pub fn empty(&self) {
