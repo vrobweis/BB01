@@ -13,7 +13,6 @@ use std::{
         HashMap,
     },
     fmt::Debug,
-    string::ParseError,
     sync::Arc,
 };
 use tokio::sync::Mutex;
@@ -46,44 +45,26 @@ pub struct Retriever {
     //add new fields to the Debug impl
 }
 impl Retriever {
-    pub async fn dl(&self, p: &Page) -> Result<Page, ParseError> {
-        if p.is_old(None) {
-            self.access(&p).await;
+    pub async fn refresh(&self, page: &Page) -> Page {
+        if !page.full.get() {
+            self.access(&page).await;
+            self.dl(page).await.unwrap()
+        } else {
+            if page.is_old(None) {
+                self.access(page).await;
+            }
+            page.refresh(Some(&self.client)).await.unwrap()
         }
-        let headers = self
-            .headers
-            .get(&p.domain().unwrap())
-            .map(Headers::to_owned)
-            .unwrap_or_default()
-            .headers;
-        p.request(
-            self.client
-                .get(p.loc.as_str())
-                .headers(headers)
-                .build()
-                .unwrap(),
-        )
-        .refresh(Some(&self.client))
-        .await
-        .unwrap();
-        Ok(p.to_owned())
-    }
-
-    pub async fn refresh<'a>(&self, page: &'a Page) -> &'a Page {
-        self.access(&page).await;
-        page.refresh(Some(&self.client)).await.unwrap()
     }
 
     pub async fn book(&self, page: Page) -> Book {
-        let index = self.dl(&page).await.unwrap().index().unwrap();
-        self.dl(&index).await.unwrap();
-        let title = index.title().to_owned();
-        let visual = index.check_visual().unwrap_or_default().to_owned();
+        let index = self.index(&page).await;
+        let title = index.title();
+        dbg!(&title);
+        let visual = index.check_visual().unwrap_or_default();
+        dbg!(&visual);
         let chapters = self.chapters(&index).await;
-        let content = match chapters {
-            Some(c) => self.contents(c, visual).await,
-            None => vec![],
-        };
+        let content = self.contents(chapters, visual).await;
         let mut bk = Book {
             title,
             index,
@@ -99,52 +80,80 @@ impl Retriever {
     }
 
     /// generate a vec with contents for every page
-    pub async fn contents(&self, pages: Vec<Page>, visual: bool) -> Vec<Content> {
-        let re = join_all(pages.iter().map(|p1| async move {
-            self.dl(p1).await.unwrap().get_content(visual)
-        }))
+    pub async fn contents(
+        &self, chapters: Vec<Page>, visual: bool,
+    ) -> Vec<Content> {
+        // Gets pages to the contents from a page of the chapter
+        let pages = join_all(
+            chapters
+                .iter()
+                .map(|a| async move { self.refresh(a).await }),
+        )
         .await;
-        let r;
+        let content_pages = pages
+            .iter()
+            .map(|a| a.get_content(visual))
+            .map(|a| a.unwrap())
+            .flatten();
         if visual {
-            let temp = join_all(
-                re.iter()
-                    .map(|a| a.as_ref().unwrap())
-                    .flatten()
-                    .map(|a| Page::from(a))
-                    .map(|a| async move { self.dl(&a).await.unwrap() }),
+            join_all(
+                content_pages
+                    .map(|a| async { self.content(&a.into(), true).await }),
             )
-            .await;
-            r = join_all(temp.iter().map(|p2| async move {
-                self.content(&self.dl(p2).await.unwrap(), true).await
-            }))
-            .await;
+            .await
         } else {
-            r = vec![Content::from(
-                re.iter()
-                    .cloned()
-                    .map(|a| a.unwrap())
-                    .flatten()
-                    .collect::<Vec<String>>()
-                    .join(""),
-            )];
+            vec![Content::from(
+                content_pages.collect::<Vec<String>>().join(""),
+            )]
         }
-        r
     }
 
     pub async fn content(&self, page: &Page, visual: bool) -> Content {
+        self.refresh(page.into()).await;
+        dbg!(page.loc.path());
         match visual {
             true => page.get_image(Some(&self.client)).await.into(),
-            false => page.text().unwrap().join("").into(),
+            false => page.text().unwrap().join("\n\n").into(),
         }
     }
 
-    pub async fn chapters(&self, p: &Page) -> Option<Vec<Page>> {
-        Some(
-            join_all(p.chaps().unwrap().iter().cloned().map(|a| async {
-                self.dl(&Page::from(a)).await.unwrap().to_owned()
-            }))
-            .await,
+    pub async fn chapters(&self, p: &Page) -> Vec<Page> {
+        join_all(
+            p.chaps()
+                .unwrap()
+                .iter()
+                .map(|a| async move { self.refresh(&Page::from(a)).await }),
         )
+        .await
+    }
+
+    pub async fn index(&self, p: &Page) -> Page {
+        self.refresh(
+            &self
+                .refresh(p)
+                .await
+                .index()
+                .map_err(|_| p.to_owned())
+                .unwrap(),
+        )
+        .await
+    }
+
+    async fn dl(&self, p: &Page) -> Result<Page, Page> {
+        let headers = self
+            .headers
+            .get(&p.domain().unwrap())
+            .map(Headers::to_owned)
+            .unwrap_or_default()
+            .headers;
+        p.request(
+            self.client
+                .get(p.loc.as_str())
+                .headers(headers)
+                .build()
+                .unwrap(),
+        );
+        p.refresh(Some(&self.client)).await
     }
 
     /// Keeps track of domains being accessed and adds delay between accessed

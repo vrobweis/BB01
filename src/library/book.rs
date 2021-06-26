@@ -29,6 +29,15 @@ impl Book {
             })
             .collect::<Vec<Content>>()
     }
+
+    pub fn save(&self) {
+        use std::path::PathBuf;
+        static LIBRARY: &str="library";
+        let pb = PathBuf::from(LIBRARY).join(self.title.0.trim());
+        self.contents()
+            .iter()
+            .for_each(move |a| a.save(&pb, self.visual));
+    }
 }
 
 impl Eq for Book {}

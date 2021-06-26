@@ -29,8 +29,8 @@ use sdl2_window::Sdl2Window;
 use std::path::PathBuf;
 
 // pub fn main() {
-    #[tokio::main]
-    pub async fn main() {
+#[tokio::main]
+pub async fn main() {
     let gl = OpenGL::V4_5;
     const WIDTH: u32 = example::WIN_W;
     const HEIGHT: u32 = example::WIN_H;

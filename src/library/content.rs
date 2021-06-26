@@ -1,6 +1,11 @@
 use crate::{Get, Page};
 use serde::{Deserialize as des, Serialize as ser};
-use std::cmp::Ordering::{self, Equal, Greater, Less};
+use std::{
+    cmp::Ordering::{self, Equal, Greater, Less},
+    fs::File,
+    io::Write,
+    path::PathBuf,
+};
 
 #[derive(Debug, Clone, Eq, PartialEq, ser, des)]
 pub struct Num(pub u16, pub Option<u8>);
@@ -49,6 +54,21 @@ impl Content {
     }
 
     pub fn data(&self) -> &Vec<u8> { self.data.as_ref().unwrap() }
+
+    pub fn save(&self, pb: &PathBuf, visual: bool) {
+        std::fs::create_dir_all(&pb).unwrap();
+        let mut pb = pb.join(self.id.to_string());
+        if visual {
+            pb.set_extension("jpg");
+        }
+        File::with_options()
+            .write(true)
+            .create(true)
+            .open(pb)
+            .unwrap()
+            .write(self.data())
+            .unwrap();
+    }
 }
 
 impl Ord for Num {
