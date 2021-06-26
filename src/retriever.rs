@@ -13,7 +13,6 @@ use std::{
         HashMap,
     },
     fmt::Debug,
-    string::ParseError,
     sync::Arc,
 };
 use tokio::sync::Mutex;
@@ -46,17 +45,26 @@ pub struct Retriever {
     //add new fields to the Debug impl
 }
 impl Retriever {
-    pub async fn book(&self, page: Page) -> Book {
-        let index = self.dl(&page).await.unwrap().index().unwrap();
-        self.dl(&index).await.unwrap();
-        let title = index.title().to_owned();
-        let visual = index.check_visual().unwrap_or_default().to_owned();
-        let chapters = self.chapters(&index).await;
-        let content = match chapters {
-            Some(c) => self.contents(&c, visual).await,
-            None => vec![],
-        };
+    pub async fn refresh(&self, page: &Page) -> Page {
+        if !page.full.get() {
+            self.access(&page).await;
+            self.dl(page).await.unwrap()
+        } else {
+            if page.is_old(None) {
+                self.access(page).await;
+            }
+            page.refresh(Some(&self.client)).await.unwrap()
+        }
+    }
 
+    pub async fn book(&self, page: Page) -> Book {
+        let index = self.index(&page).await;
+        let title = index.title();
+        dbg!(&title);
+        let visual = index.check_visual().unwrap_or_default();
+        dbg!(&visual);
+        let chapters = self.chapters(&index).await;
+        let content = self.contents(chapters, visual).await;
         let mut bk = Book {
             title,
             index,
@@ -64,68 +72,74 @@ impl Retriever {
             ..Default::default()
         };
         content.iter().for_each(|a| {
-            a.iter().for_each(|b| {
-                let place = b.src.as_ref().unwrap().get_place();
-                bk.content.insert(
-                    crate::Num(place.1, Some(place.0 as u8)),
-                    b.to_owned(),
-                );
-            })
+            let place = a.src.as_ref().unwrap().get_place();
+            bk.content
+                .insert(crate::Num(place.1, Some(place.0 as u8)), a.to_owned());
         });
         bk
     }
 
     /// generate a vec with contents for every page
     pub async fn contents(
-        &self, pages: &Vec<Page>, visual: bool,
-    ) -> Vec<Vec<Content>> {
-        join_all(pages.iter().map(|p1| async move {
-            let res = self.dl(p1).await.unwrap().get_content(visual).unwrap();
-            match visual {
-                true => {
-                    join_all(res.iter().map(Page::from).map(|p2| async move {
-                        self.dl(&p2).await.unwrap().into()
-                    }))
-                    .await
-                }
-                false => vec![Content::from(res.join(""))],
-            }
-        }))
+        &self, chapters: Vec<Page>, visual: bool,
+    ) -> Vec<Content> {
+        // Gets pages to the contents from a page of the chapter
+        let pages = join_all(
+            chapters
+                .iter()
+                .map(|a| async move { self.refresh(a).await }),
+        )
+        .await;
+        let content_pages = pages
+            .iter()
+            .map(|a| a.get_content(visual))
+            .map(|a| a.unwrap())
+            .flatten();
+        if visual {
+            join_all(
+                content_pages
+                    .map(|a| async { self.content(&a.into(), true).await }),
+            )
+            .await
+        } else {
+            vec![Content::from(
+                content_pages.collect::<Vec<String>>().join(""),
+            )]
+        }
+    }
+
+    pub async fn content(&self, page: &Page, visual: bool) -> Content {
+        self.refresh(page.into()).await;
+        dbg!(page.loc.path());
+        match visual {
+            true => page.get_image(Some(&self.client)).await.into(),
+            false => page.text().unwrap().join("\n\n").into(),
+        }
+    }
+
+    pub async fn chapters(&self, p: &Page) -> Vec<Page> {
+        join_all(
+            p.chaps()
+                .unwrap()
+                .iter()
+                .map(|a| async move { self.refresh(&Page::from(a)).await }),
+        )
         .await
     }
 
-    pub async fn content(&self, page: &Page, visual: bool) -> Vec<Content> {
-        let res = page
-            .refresh(Some(&self.client))
-            .await
-            .unwrap()
-            .get_content(visual);
-        match visual {
-            true => {
-                join_all(res.unwrap().iter().map(Page::from).map(
-                    |p| async move {
-                        p.refresh(Some(&self.client)).await.unwrap().into()
-                    },
-                ))
+    pub async fn index(&self, p: &Page) -> Page {
+        self.refresh(
+            &self
+                .refresh(p)
                 .await
-            }
-            false => vec![Content::from(res.unwrap().join(""))],
-        }
-    }
-
-    pub async fn chapters(&self, p: &Page) -> Option<Vec<Page>> {
-        Some(
-            join_all(p.chaps().unwrap().iter().cloned().map(|a| async {
-                self.dl(&Page::from(a)).await.unwrap().to_owned()
-            }))
-            .await,
+                .index()
+                .map_err(|_| p.to_owned())
+                .unwrap(),
         )
+        .await
     }
 
-    pub async fn dl(&self, p: &Page) -> Result<Page, ParseError> {
-        if p.is_old(None) {
-            self.access(&p).await;
-        }
+    async fn dl(&self, p: &Page) -> Result<Page, Page> {
         let headers = self
             .headers
             .get(&p.domain().unwrap())
@@ -138,18 +152,15 @@ impl Retriever {
                 .headers(headers)
                 .build()
                 .unwrap(),
-        )
-        .refresh(Some(&self.client))
-        .await
-        .unwrap();
-        Ok(p.to_owned())
+        );
+        p.refresh(Some(&self.client)).await
     }
 
     /// Keeps track of domains being accessed and adds delay between accessed
     async fn access(&self, p: &Page) {
         match self.sites.lock().await.entry(p.domain().unwrap()) {
             Occupied(mut e) => {
-                e.get_mut().delay(super::duration()).await;
+                e.get_mut().delay_if(super::duration()).await;
             }
             Vacant(e) => {
                 e.insert(Default::default());

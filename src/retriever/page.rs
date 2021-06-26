@@ -1,6 +1,5 @@
 use crate::{Finder, Get};
 use chrono::{DateTime, Duration, Utc};
-use core::slice::SlicePattern;
 use reqwest::{Client, Request, Url};
 use select::{
     document::Document,
@@ -44,7 +43,7 @@ pub struct Page {
 
 impl Page {
     /// Loads the html and parsed html in Page preparation for future actions
-    pub async fn refresh(&self, client: Option<&Client>) -> Result<&Self, &Self> {
+    pub async fn refresh(&self, client: Option<&Client>) -> Result<Self, Self> {
         if self.doc.borrow().is_none() {
             self.full.set(false);
         };
@@ -55,13 +54,14 @@ impl Page {
                 .execute(rq.try_clone().unwrap())
                 .await
                 .unwrap();
-            let html = resp.text().await.unwrap().to_owned();
+            // dbg!(&self);
+            let html = resp.text().await.unwrap();
             self.doc.replace(Some(html.as_str().into()));
             self.html.replace(Some(html));
             self.full.set(true);
-            Ok(self)
+            Ok(self.to_owned())
         } else {
-            Err(self)
+            Err(self.to_owned())
         }
     }
 
@@ -175,10 +175,9 @@ impl Page {
 
     pub async fn get_image(&self, client: Option<&Client>) -> Vec<u8> {
         if self.req.borrow().is_none() {
-            return Default::default();
+            return Vec::new();
         }
         client
-            .to_owned()
             .unwrap()
             .execute(self.req.borrow().as_ref().unwrap().try_clone().unwrap())
             .await
@@ -186,12 +185,11 @@ impl Page {
             .bytes()
             .await
             .unwrap()
-            .as_slice()
-            .to_owned()
+            .to_vec()
     }
 
     pub fn check_visual(&self) -> Option<bool> {
-        let t = vec!["novel", "royalroad", "comrademao"];
+        let t = vec!["novel", "royalroad", "manganov", "comrademao"];
         let p = vec!["manga", "scans", "hentai", "pururin", "luscious"];
         let f = |s: &&str| -> bool {
             self.loc.origin().ascii_serialization().contains(s)
@@ -206,7 +204,7 @@ impl Page {
 
     pub fn is_old(&self, d: Option<Duration>) -> bool {
         (self.last + d.unwrap_or(Duration::seconds(10))) < Utc::now() ||
-            self.full.get()
+            !self.full.get()
     }
 
     pub fn empty(&self) {
