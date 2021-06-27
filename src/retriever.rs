@@ -1,5 +1,5 @@
 use self::delay::Delay;
-use crate::{Book, Content};
+use crate::{Book, Content, Media};
 use futures::future::join_all;
 use reqwest::Client;
 use serde::{Deserialize as des, Serialize as ser};
@@ -57,64 +57,57 @@ impl Retriever {
         }
     }
 
-    pub async fn book(&self, page: Page) -> Book {
+    pub async fn book<T: Media + Clone>(&self, page: Page) -> Book<T> {
+        let visual = page.check_visual().unwrap_or_default();
+        dbg!(&visual);
         let index = self.index(&page).await;
         let title = index.title();
         dbg!(&title);
-        let visual = index.check_visual().unwrap_or_default();
-        dbg!(&visual);
         let chapters = self.chapters(&index).await;
-        let content = self.contents(chapters, visual).await;
+        let content = self.contents(chapters).await;
+        //Add content type to book
         let mut bk = Book {
             title,
             index,
-            visual,
             ..Default::default()
         };
-        content.iter().for_each(|a| {
+        content.into_iter().for_each(|a| {
             let place = a.src.as_ref().unwrap().get_place();
             bk.content
-                .insert(crate::Num(place.1, Some(place.0 as u8)), a.to_owned());
+                .insert(crate::Num(place.1, Some(place.0 as u8)), *a);
         });
         bk
     }
 
     /// generate a vec with contents for every page
-    pub async fn contents(
-        &self, chapters: Vec<Page>, visual: bool,
-    ) -> Vec<Content> {
+    pub async fn contents<T: Media>(
+        &self, chapters: Vec<Page>,
+    ) -> Vec<Box<Content<T>>> {
         // Gets pages to the contents from a page of the chapter
-        let pages = join_all(
-            chapters
-                .iter()
-                .map(|a| async move { self.refresh(a).await }),
-        )
-        .await;
-        let content_pages = pages
+        let content_pages = chapters
             .iter()
-            .map(|a| a.get_content(visual))
+            .map(|a| a.get_content::<T>())
             .map(|a| a.unwrap())
             .flatten();
-        if visual {
+        if T::visual() {
             join_all(
-                content_pages
-                    .map(|a| async { self.content(&a.into(), true).await }),
+                content_pages.map(|a| async { self.content(&a.into()).await }),
             )
             .await
         } else {
-            vec![Content::from(
+            vec![Box::new(Content::from(
                 content_pages.collect::<Vec<String>>().join(""),
-            )]
+            ))]
         }
     }
 
-    pub async fn content(&self, page: &Page, visual: bool) -> Content {
+    pub async fn content<T: Media>(&self, page: &Page) -> Box<Content<T>> {
         self.refresh(page.into()).await;
         dbg!(page.loc.path());
-        match visual {
-            true => page.get_image(Some(&self.client)).await.into(),
+        Box::new(match T::visual() {
+            true => page.get_image(&self.client).await.into(),
             false => page.text().unwrap().join("\n\n").into(),
-        }
+        })
     }
 
     pub async fn chapters(&self, p: &Page) -> Vec<Page> {

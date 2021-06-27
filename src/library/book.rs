@@ -1,4 +1,4 @@
-use crate::{Chapter, Content, Num, Page};
+use crate::{Content, Media, Num, Page};
 use serde::{Deserialize as des, Serialize as ser};
 use serde_with::serde_as;
 use std::collections::BTreeMap;
@@ -8,44 +8,29 @@ use tokio::macros::support::thread_rng_n;
 pub struct Label(pub String);
 #[serde_as]
 #[derive(Clone, Default, Debug, ser, des)]
-pub struct Book {
+pub struct Book<T: Media> {
     pub title:   Label,
     pub index:   Page,
-    pub visual:  bool,
+    // #[serde_as(as = "Vec<(_, _)>")]
+    // pub chs:     BTreeMap<u16, Chapter<T>>,
     #[serde_as(as = "Vec<(_, _)>")]
-    pub chs:     BTreeMap<u16, Chapter>,
-    #[serde_as(as = "Vec<(_, _)>")]
-    pub content: BTreeMap<Num, Content>,
+    pub content: BTreeMap<Num, Content<T>>,
     pub pos:     u32,
 }
 
-impl Book {
-    pub fn contents(&self) -> Vec<Content> {
-        self.content
-            .values()
-            .map(|a| {
-                a.src.as_ref().unwrap().empty();
-                a.to_owned()
-            })
-            .collect::<Vec<Content>>()
-    }
-
+impl<T: Media> Book<T> {
     pub fn save(&self) {
         use std::path::PathBuf;
-        static LIBRARY: &str="library";
+        static LIBRARY: &str = "library";
         let pb = PathBuf::from(LIBRARY).join(self.title.0.trim());
-        self.contents()
-            .iter()
-            .for_each(move |a| a.save(&pb, self.visual));
+        self.content.iter().for_each(move |(_, a)| a.save(&pb));
     }
 }
 
-impl Eq for Book {}
-impl PartialEq for Book {
+impl<T: Media + Eq> Eq for Book<T> {}
+impl<T: Media + PartialEq> PartialEq for Book<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.index == other.index &&
-            self.visual == other.visual &&
-            self.content == other.content
+        self.index == other.index && self.content == other.content
     }
 }
 impl Default for Label {

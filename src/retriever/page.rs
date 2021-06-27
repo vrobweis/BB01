@@ -7,7 +7,7 @@ use select::{
 };
 use serde::{Deserialize as des, Serialize as ser};
 use std::{
-    cell::{Cell, Ref, RefCell},
+    cell::{Cell, RefCell},
     cmp::Ordering,
     hash::{Hash, Hasher},
     rc::Rc,
@@ -20,10 +20,10 @@ impl Default for Page {
         Self {
             loc:  "http://codenova.ddns.net/".parse().unwrap(),
             last: Utc::now(),
-            html: RefCell::new(None),
-            doc:  RefCell::new(None),
-            req:  Rc::new(RefCell::new(None)),
-            full: Cell::new(false),
+            html: Default::default(),
+            doc:  Default::default(),
+            req:  Default::default(),
+            full: Default::default(),
         }
     }
 }
@@ -166,26 +166,25 @@ impl Page {
         }
     }
 
-    pub fn get_content(&self, visual: bool) -> Option<Vec<String>> {
-        match visual {
+    pub fn get_content<T: crate::Media>(&self) -> Option<Vec<String>> {
+        match T::visual() {
             true => self.images(),
             false => self.text(),
         }
     }
 
-    pub async fn get_image(&self, client: Option<&Client>) -> Vec<u8> {
-        if self.req.borrow().is_none() {
-            return Vec::new();
+    pub async fn get_image(&self, client: &Client) -> Vec<u8> {
+        match self.req.borrow().as_ref() {
+            Some(req) => client
+                .execute(req.try_clone().unwrap())
+                .await
+                .unwrap()
+                .bytes()
+                .await
+                .unwrap()
+                .to_vec(),
+            None => Vec::new(),
         }
-        client
-            .unwrap()
-            .execute(self.req.borrow().as_ref().unwrap().try_clone().unwrap())
-            .await
-            .unwrap()
-            .bytes()
-            .await
-            .unwrap()
-            .to_vec()
     }
 
     pub fn check_visual(&self) -> Option<bool> {
@@ -217,7 +216,7 @@ impl Page {
 impl Finder for Page {}
 impl Get for Page {
     #[inline]
-    fn doc(&self) -> Ref<'_, Option<Document>> { self.doc.borrow() }
+    fn doc(&self) -> crate::Doc { self.doc.borrow() }
 }
 
 impl Eq for Page {}
