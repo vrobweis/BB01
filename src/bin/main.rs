@@ -4,7 +4,7 @@ use conrod_core::{text::rt::Rect, Scalar};
 use conrod_example_shared as example;
 use conrod_piston::{draw::primitives as draw_primitives, event::convert};
 use example::DemoApp;
-use pagepal::{Manga, Novel, fullscreen, library::Library, theme};
+use pagepal::{fullscreen, library::Library, theme, Manga, Novel};
 use piston_window::{
     texture::{Format::Rgba8, UpdateTexture},
     AdvancedWindow,

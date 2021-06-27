@@ -44,72 +44,74 @@ pub struct Retriever {
     finders: BTreeMap<Host, FindWrap>,
     //add new fields to the Debug impl
 }
+/// Struct for download logic
 impl Retriever {
     pub async fn refresh(&self, page: &Page) -> Page {
+        self.access(page).await;
         if !page.full.get() {
-            self.access(&page).await;
             self.dl(page).await.unwrap()
         } else {
-            if page.is_old(None) {
-                self.access(page).await;
-            }
+            if page.is_old(None) {}
             page.refresh(Some(&self.client)).await.unwrap()
         }
     }
 
-    pub async fn book<T: Media + Clone>(&self, page: Page) -> Book<T> {
-        let visual = page.check_visual().unwrap_or_default();
-        dbg!(&visual);
+    /// Generates a Book<T> from a page to either
+    /// a chapter or the index of the book
+    pub async fn book<T: Debug + Media + Clone>(&self, page: Page) -> Book<T> {
         let index = self.index(&page).await;
         let title = index.title();
-        dbg!(&title);
-        let chapters = self.chapters(&index).await;
-        let content = self.contents(chapters).await;
+        let chapters = self
+            .chapters(&index)
+            .await
+            .into_iter()
+            .map(|a| (a.get_content::<T>().unwrap().clone(), a));
+        let mut contents = vec![];
+        match T::visual() {
+            true => {
+                for (c, _) in chapters {
+                    contents.extend(
+                        join_all(c.iter().map(|a| async move {
+                            let page = self.refresh(&Page::from(a)).await;
+                            (
+                                page.clone(),
+                                Content::from(page.get_image(&self.client).await),
+                            )
+                                .into()
+                        }))
+                        .await,
+                    )
+                }
+            }
+            false => contents.extend(chapters.map(|(c, p)| {
+                let d: Content<T> = c.join("\n\n").into();
+                (p, d).into()
+            })),
+        }
         //Add content type to book
         let mut bk = Book {
             title,
             index,
             ..Default::default()
         };
-        content.into_iter().for_each(|a| {
+        contents.into_iter().for_each(|a: Content<T>| {
             let place = a.src.as_ref().unwrap().get_place();
             bk.content
-                .insert(crate::Num(place.1, Some(place.0 as u8)), *a);
+                .insert(crate::Num(place.1, Some(place.0 as u8)), a);
         });
         bk
     }
 
-    /// generate a vec with contents for every page
-    pub async fn contents<T: Media>(
-        &self, chapters: Vec<Page>,
-    ) -> Vec<Box<Content<T>>> {
-        // Gets pages to the contents from a page of the chapter
-        let content_pages = chapters
-            .iter()
-            .map(|a| a.get_content::<T>())
-            .map(|a| a.unwrap())
-            .flatten();
-        if T::visual() {
-            join_all(
-                content_pages.map(|a| async { self.content(&a.into()).await }),
-            )
-            .await
-        } else {
-            vec![Box::new(Content::from(
-                content_pages.collect::<Vec<String>>().join(""),
-            ))]
-        }
+    /// Generate a vec with contents for every page
+    pub async fn contents<T: Media>(&self, chaps: Vec<Page>) -> Vec<Content<T>> {
+        join_all(chaps.iter().map(|page| async move {
+            self.refresh(&page).await;
+            page.get_image(&self.client).await.into()
+        }))
+        .await
     }
 
-    pub async fn content<T: Media>(&self, page: &Page) -> Box<Content<T>> {
-        self.refresh(page.into()).await;
-        dbg!(page.loc.path());
-        Box::new(match T::visual() {
-            true => page.get_image(&self.client).await.into(),
-            false => page.text().unwrap().join("\n\n").into(),
-        })
-    }
-
+    /// Gets Pages to all chapters found in an index page
     pub async fn chapters(&self, p: &Page) -> Vec<Page> {
         join_all(
             p.chaps()
@@ -120,6 +122,7 @@ impl Retriever {
         .await
     }
 
+    /// Tries getting the Index page of the work
     pub async fn index(&self, p: &Page) -> Page {
         self.refresh(
             &self
@@ -132,28 +135,30 @@ impl Retriever {
         .await
     }
 
-    async fn dl(&self, p: &Page) -> Result<Page, Page> {
+    /// Initial Page download preparations and actual dl.
+    async fn dl(&self, page: &Page) -> Result<Page, Page> {
         let headers = self
             .headers
-            .get(&p.domain().unwrap())
+            .get(&page.domain().unwrap())
             .map(Headers::to_owned)
             .unwrap_or_default()
             .headers;
-        p.request(
+        page.request(
             self.client
-                .get(p.loc.as_str())
+                .get(page.loc.as_str())
                 .headers(headers)
                 .build()
                 .unwrap(),
         );
-        p.refresh(Some(&self.client)).await
+        page.refresh(Some(&self.client)).await
     }
 
     /// Keeps track of domains being accessed and adds delay between accessed
     async fn access(&self, p: &Page) {
         match self.sites.lock().await.entry(p.domain().unwrap()) {
             Occupied(mut e) => {
-                e.get_mut().delay_if(super::duration()).await;
+                let mut b = e.get_mut().clone();
+                b.delay_if(super::duration()).await;
             }
             Vacant(e) => {
                 e.insert(Default::default());
