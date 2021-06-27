@@ -1,5 +1,5 @@
-use crate::Retriever;
-use serde::{Deserialize as des, Serialize as ser};
+use crate::{Page, Retriever};
+use serde::{de::DeserializeOwned as deso, Deserialize as des, Serialize as ser};
 use serde_with::serde_as;
 use std::collections::HashMap;
 
@@ -8,28 +8,49 @@ pub mod chapter;
 pub mod content;
 pub mod id;
 
-pub(crate) use self::{book::*, chapter::*, content::*};
+#[allow(unused)] pub(crate) use self::{book::*, chapter::*, content::*};
+pub use content::{Manga, Novel};
 
 #[serde_as]
 #[derive(Default, Debug, Clone, ser, des)]
-pub struct Library {
+pub struct Library<T = Novel, S = Manga>
+where
+    T: Media,
+    S: Media, {
     #[serde_as(as = "Vec<(_, _)>")]
-    pub books: HashMap<Label, Book>,
-    r:         Retriever,
+    pub novels: HashMap<Label, Book<T>>,
+    #[serde_as(as = "Vec<(_, _)>")]
+    pub manga:  HashMap<Label, Book<S>>,
+    r:          Retriever,
 }
 
-impl Library {
-    pub async fn from_url(&mut self, url: String) -> Option<Book> {
-        let page = url.into();
-        let book = self.r.book(page).await;
-        self.books.insert(book.title.clone(), book)
+impl<T: Media + deso + Clone, S: Media + deso + Clone> Library<T, S> {
+    pub async fn from_url<Z: Media + Clone>(&mut self, url: String) {
+        let page = Page::from(url);
+        self.r.refresh(&page).await;
+        let b = &page.check_visual().unwrap();
+        if *b {
+            let book = self.r.book(page).await;
+            self.add_manga(book);
+        } else {
+            let book = self.r.book(page).await;
+            self.add_novel(book);
+        }
     }
 
-    pub fn rename_book(&mut self, idx: &Label, name: String) {
-        match self.books.remove(idx) {
+    fn add_manga(&mut self, book: Book<S>) -> Option<Book<S>> {
+        self.manga.insert(book.title.clone(), book)
+    }
+
+    fn add_novel(&mut self, book: Book<T>) -> Option<Book<T>> {
+        self.novels.insert(book.title.clone(), book)
+    }
+
+    pub fn rename_novel(&mut self, idx: &Label, name: String) {
+        match self.novels.remove(idx) {
             Some(mut b) => {
                 b.title = name.clone().into();
-                self.books.insert(name.into(), b)
+                self.novels.insert(name.into(), b)
             }
             None => todo!(),
         };

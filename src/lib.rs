@@ -11,7 +11,7 @@ async fn base() {
     use self::*;
     const TEST: &str = "https://readmanganato.com/manga-lt989154/chapter-21";
     let r = Retriever::default();
-    let c = r.book(TEST.to_owned().into()).await;
+    let c: Book<Manga> = r.book(TEST.into()).await;
     c.save();
     println!("{:?}", c.content.len());
 }

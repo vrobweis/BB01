@@ -4,7 +4,7 @@ use conrod_core::{text::rt::Rect, Scalar};
 use conrod_example_shared as example;
 use conrod_piston::{draw::primitives as draw_primitives, event::convert};
 use example::DemoApp;
-use pagepal::{fullscreen, library::Library, theme};
+use pagepal::{Manga, Novel, fullscreen, library::Library, theme};
 use piston_window::{
     texture::{Format::Rgba8, UpdateTexture},
     AdvancedWindow,
@@ -36,7 +36,7 @@ pub async fn main() {
     const HEIGHT: u32 = example::WIN_H;
     let assets = PathBuf::from("assets");
     let font_path = assets.join("NotoSans-Regular.ttf");
-    let _library = Library::default();
+    let _library: Library<Novel, Manga> = Library::default();
 
     let mut window: PistonWindow<Sdl2Window> =
         WindowSettings::new("Pagepal conrod testing", [WIDTH, HEIGHT])

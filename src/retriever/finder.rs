@@ -7,7 +7,7 @@ use select::{
 use serde_traitobject::{Deserialize as des, Serialize as ser};
 use std::cell::Ref;
 
-type Doc<'a> = Ref<'a, Option<Document>>;
+pub type Doc<'a> = Ref<'a, Option<Document>>;
 #[cfg(feature = "trait_ojb_ser")]
 pub trait Finder: des + ser {
     /// Returns the text from the children of the <div> with most <p> tags
@@ -211,7 +211,7 @@ pub trait Finder {
     }
 }
 pub trait Get: Finder {
-    fn doc(&self) -> Ref<'_, Option<Document>>;
+    fn doc(&self) -> Doc;
     #[inline]
     fn text(&self) -> Option<Vec<String>> { self.text_def()(self.doc()) }
     #[inline]

@@ -7,58 +7,85 @@ use std::{
     path::PathBuf,
 };
 
+pub type Novel = String;
+pub type Manga = Box<Vec<u8>>;
+
+pub trait Media
+where
+    Self: Default + ser + serde::de::DeserializeOwned, {
+    fn save(&self) {}
+    fn from(src: Vec<u8>) -> Self;
+    fn fetch() {}
+    fn visual() -> bool { false }
+    fn get(&self) -> &[u8];
+}
+
+impl Media for Novel {
+    fn from(src: Vec<u8>) -> Self { String::from_utf8(src).unwrap() }
+
+    fn get(&self) -> &[u8] { self.as_bytes() }
+}
+impl Media for Manga {
+    fn from(src: Vec<u8>) -> Self { Box::new(src) }
+
+    fn visual() -> bool { true }
+
+    fn get(&self) -> &[u8] { &self }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, ser, des)]
 pub struct Num(pub u16, pub Option<u8>);
 #[derive(Debug, Clone, Default, Eq, PartialEq, ser, des)]
-pub struct Content {
+pub struct Content<T: Media> {
     pub id:  u64,
     pub src: Option<Page>,
-    data:    Option<Vec<u8>>, // UNSAFE!
+    #[serde(skip)]
+    data:    T,
 }
-impl Content {
+impl<T: Media> Content<T>
+where
+    Self: Default,
+{
     pub fn lighten(&self) {
         match &self.src {
             Some(p) => p.empty(),
-            None => todo!(),
+            None => {}
         }
     }
 
     pub async fn fetch_image(&mut self) {
-        if let (Some(page), Some(data)) = (&self.src, &mut self.data) {
-            *data = page.get_image(None).await;
+        if let (Some(page), data) = (&self.src, &mut self.data) {
+            use reqwest::Client;
+            *data = T::from(page.get_image(&Client::new()).await);
         }
     }
 
     pub async fn fetch_novel(&mut self) {
-        if let (Some(page), Some(data)) = (&self.src, &mut self.data) {
-            *data = page
-                .refresh(None)
-                .await
-                .unwrap()
-                .text()
-                .unwrap()
-                .join("\n\n")
-                .bytes()
-                .collect();
+        if let (Some(page), data) = (&self.src, &mut self.data) {
+            *data = T::from(
+                page.refresh(None)
+                    .await
+                    .unwrap()
+                    .text()
+                    .unwrap()
+                    .join("\n\n")
+                    .bytes()
+                    .collect(),
+            );
         }
     }
 
-    pub async fn data_load(&mut self, visual: bool) {
-        match self.data {
-            None => match visual {
-                true => self.fetch_image().await,
-                false => self.fetch_novel().await,
-            },
-            _ => {}
+    pub async fn data_load(&mut self) {
+        match T::visual() {
+            true => self.fetch_image().await,
+            false => self.fetch_novel().await,
         };
     }
 
-    pub fn data(&self) -> &Vec<u8> { self.data.as_ref().unwrap() }
-
-    pub fn save(&self, pb: &PathBuf, visual: bool) {
+    pub fn save(&self, pb: &PathBuf) {
         std::fs::create_dir_all(&pb).unwrap();
         let mut pb = pb.join(self.id.to_string());
-        if visual {
+        if T::visual() {
             pb.set_extension("jpg");
         }
         File::with_options()
@@ -66,7 +93,7 @@ impl Content {
             .create(true)
             .open(pb)
             .unwrap()
-            .write(self.data())
+            .write(self.data.get())
             .unwrap();
     }
 }
@@ -126,42 +153,42 @@ impl From<String> for Num {
     }
 }
 
-impl From<Page> for Content {
+impl<T: Media> From<Page> for Content<T> {
     fn from(p: Page) -> Self {
-        Content {
+        Content::<T> {
             src: Some(p),
             ..Default::default()
         }
     }
 }
-impl From<&Page> for Content {
+impl<T: Media> From<&Page> for Content<T> {
     fn from(p: &Page) -> Self {
-        Content {
+        Content::<T> {
             src: Some(p.to_owned()),
             ..Default::default()
         }
     }
 }
-impl From<String> for Content {
+impl<T: Media> From<String> for Content<T> {
     fn from(data: String) -> Self {
-        Content {
-            data: Some(data.bytes().collect()),
+        Content::<T> {
+            data: T::from(data.bytes().collect()),
             ..Default::default()
         }
     }
 }
-impl From<&String> for Content {
+impl<T: Media> From<&String> for Content<T> {
     fn from(data: &String) -> Self {
-        Content {
-            data: Some(data.bytes().collect()),
+        Content::<T> {
+            data: T::from(data.bytes().collect()),
             ..Default::default()
         }
     }
 }
-impl From<Vec<u8>> for Content {
+impl<T: Media> From<Vec<u8>> for Content<T> {
     fn from(data: Vec<u8>) -> Self {
-        Content {
-            data: Some(data),
+        Content::<T> {
+            data: T::from(data),
             ..Default::default()
         }
     }
