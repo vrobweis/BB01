@@ -47,4 +47,4 @@ pub fn fullscreen(window: &mut PistonWindow<Sdl2Window>) {
     };
 }
 #[inline]
-pub fn duration() -> Duration { Duration::milliseconds(100) }
+pub fn duration() -> Duration { Duration::milliseconds(300) }

@@ -33,7 +33,7 @@ impl Media for Manga {
     fn get(&self) -> &[u8] { &self }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, ser, des)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, ser, des)]
 pub struct Num(pub u16, pub Option<u8>);
 #[derive(Debug, Clone, Default, Eq, PartialEq, ser, des)]
 pub struct Content<T: Media> {
@@ -42,10 +42,7 @@ pub struct Content<T: Media> {
     #[serde(skip)]
     data:    T,
 }
-impl<T: Media> Content<T>
-where
-    Self: Default,
-{
+impl<T: Media> Content<T> {
     pub fn lighten(&self) {
         match &self.src {
             Some(p) => p.empty(),
@@ -84,7 +81,9 @@ where
 
     pub fn save(&self, pb: &PathBuf) {
         std::fs::create_dir_all(&pb).unwrap();
-        let mut pb = pb.join(self.id.to_string());
+        let p1 = format!("c{:04}", self.id / 256);
+        let p2 = format!("p{:04}", self.id % 256);
+        let mut pb = pb.join(p1 + &p2);
         if T::visual() {
             pb.set_extension("jpg");
         }
@@ -191,5 +190,14 @@ impl<T: Media> From<Vec<u8>> for Content<T> {
             data: T::from(data),
             ..Default::default()
         }
+    }
+}
+impl<T: Media> From<(Page, Content<T>)> for Content<T> {
+    fn from(tup: (Page, Content<T>)) -> Self {
+        let mut a = tup.1;
+        let id = tup.0.get_place();
+        a.id = id.0 as u64 + id.1 as u64 * 256;
+        a.src = Some(tup.0);
+        a
     }
 }

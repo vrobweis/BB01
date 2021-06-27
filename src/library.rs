@@ -8,15 +8,15 @@ pub mod chapter;
 pub mod content;
 pub mod id;
 
-#[allow(unused)] pub(crate) use self::{book::*, chapter::*, content::*};
+#[allow(unused)] pub use self::{book::*, chapter::*, content::*};
 pub use content::{Manga, Novel};
 
 #[serde_as]
 #[derive(Default, Debug, Clone, ser, des)]
 pub struct Library<T = Novel, S = Manga>
 where
-    T: Media,
-    S: Media, {
+    T: Media + std::fmt::Debug,
+    S: Media + std::fmt::Debug, {
     #[serde_as(as = "Vec<(_, _)>")]
     pub novels: HashMap<Label, Book<T>>,
     #[serde_as(as = "Vec<(_, _)>")]
@@ -24,7 +24,11 @@ where
     r:          Retriever,
 }
 
-impl<T: Media + deso + Clone, S: Media + deso + Clone> Library<T, S> {
+impl<
+    T: std::fmt::Debug + Media + deso + Clone,
+    S: std::fmt::Debug + Media + deso + Clone,
+> Library<T, S>
+{
     pub async fn from_url<Z: Media + Clone>(&mut self, url: String) {
         let page = Page::from(url);
         self.r.refresh(&page).await;
@@ -54,5 +58,10 @@ impl<T: Media + deso + Clone, S: Media + deso + Clone> Library<T, S> {
             }
             None => todo!(),
         };
+    }
+
+    pub fn save(&self) {
+        self.manga.values().into_iter().for_each(|b| b.save());
+        self.novels.values().into_iter().for_each(|b| b.save());
     }
 }
