@@ -1,4 +1,4 @@
-use crate::{Content, Media, Num, Page};
+use crate::{Chapter, Content, Media, Num, Page};
 use serde::{Deserialize as des, Serialize as ser};
 use serde_with::serde_as;
 use std::collections::BTreeMap;
@@ -11,8 +11,8 @@ pub struct Label(pub String);
 pub struct Book<T: Media> {
     pub title:   Label,
     pub index:   Page,
-    // #[serde_as(as = "Vec<(_, _)>")]
-    // pub chs:     BTreeMap<u16, Chapter<T>>,
+    #[serde_as(as = "Vec<(_, _)>")]
+    pub chs:     BTreeMap<u16, Chapter<T>>,
     #[serde_as(as = "Vec<(_, _)>")]
     pub content: BTreeMap<Num, Content<T>>,
     pub pos:     u32,
