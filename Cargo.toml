@@ -7,7 +7,7 @@ resolver = "2"
 version = "0.1.2"
 
 [profile.release]
-debug = true
+# debug = true
 
 [package.metadata.vcpkg]
 branch = "master"

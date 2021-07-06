@@ -2,10 +2,13 @@
 
 pub mod funcs;
 pub mod library;
+pub mod reader;
 pub mod retriever;
+pub mod ui;
 
 pub use self::{funcs::*, library::*, retriever::*};
 
+pub static APPNAME: &str = "pagepal";
 #[tokio::test]
 async fn base() {
     use self::*;

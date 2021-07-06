@@ -8,11 +8,13 @@ use serde_traitobject::{Deserialize as des, Serialize as ser};
 use std::cell::Ref;
 
 pub type Doc<'a> = Ref<'a, Option<Document>>;
+type Cnt = Option<Vec<String>>;
+
 #[cfg(feature = "trait_ojb_ser")]
 pub trait Finder: des + ser {
     /// Returns the text from the children of the <div> with most <p> tags
     #[inline]
-    fn text_def(&self) -> Box<dyn Fn(Doc) -> Option<Vec<String>>> {
+    fn text_def(&self) -> Box<dyn Fn(Doc) -> Cnt> {
         Box::new(|doc: Doc| {
             doc.as_ref().map(|a| {
                 // TODO: Improve by par_map()?
@@ -29,7 +31,7 @@ pub trait Finder: des + ser {
     }
     /// similar to index() return the srcs from the div with most <img>
     #[inline]
-    fn images_def(&self) -> Box<dyn Fn(Doc) -> Option<Vec<String>>> {
+    fn images_def(&self) -> Box<dyn Fn(Doc) -> Cnt> {
         Box::new(|doc: Doc| {
             doc.as_ref().map(|a| {
                 a.select(Child(Name("div"), Name("img")))
@@ -47,7 +49,7 @@ pub trait Finder: des + ser {
     }
     /// Returns the biggest congregation of links in the html
     #[inline]
-    fn chaps_def(&self) -> Box<dyn Fn(Doc) -> Option<Vec<String>>> {
+    fn chaps_def(&self) -> Box<dyn Fn(Doc) -> Cnt> {
         Box::new(|doc: Doc| {
             doc.as_ref().map(|a: &Document| {
                 a.select(Descendant(
@@ -113,7 +115,7 @@ pub trait Finder: des + ser {
 pub trait Finder {
     /// Returns the text from the children of the <div> with most <p> tags
     #[inline]
-    fn text_def(&self) -> Box<dyn Fn(Doc) -> Option<Vec<String>>> {
+    fn text_def(&self) -> Box<dyn Fn(Doc) -> Cnt> {
         Box::new(|doc: Doc| {
             doc.as_ref().map(|a| {
                 // TODO: Improve by par_map()?
@@ -130,7 +132,7 @@ pub trait Finder {
     }
     /// similar to index() return the srcs from the div with most <img>
     #[inline]
-    fn images_def(&self) -> Box<dyn Fn(Doc) -> Option<Vec<String>>> {
+    fn images_def(&self) -> Box<dyn Fn(Doc) -> Cnt> {
         Box::new(|doc: Doc| {
             doc.as_ref().map(|a| {
                 a.select(Child(Name("div"), Name("img")))
@@ -148,7 +150,7 @@ pub trait Finder {
     }
     /// Returns the biggest congregation of links in the html
     #[inline]
-    fn chaps_def(&self) -> Box<dyn Fn(Doc) -> Option<Vec<String>>> {
+    fn chaps_def(&self) -> Box<dyn Fn(Doc) -> Cnt> {
         Box::new(|doc: Doc| {
             doc.as_ref().map(|a: &Document| {
                 a.select(Descendant(
@@ -213,11 +215,11 @@ pub trait Finder {
 pub trait Get: Finder {
     fn doc(&self) -> Doc;
     #[inline]
-    fn text(&self) -> Option<Vec<String>> { self.text_def()(self.doc()) }
+    fn text(&self) -> Cnt { self.text_def()(self.doc()) }
     #[inline]
-    fn chaps(&self) -> Option<Vec<String>> { self.chaps_def()(self.doc()) }
+    fn chaps(&self) -> Cnt { self.chaps_def()(self.doc()) }
     #[inline]
-    fn images(&self) -> Option<Vec<String>> { self.images_def()(self.doc()) }
+    fn images(&self) -> Cnt { self.images_def()(self.doc()) }
     #[inline]
     fn title(&self) -> Label { self.title_def()(self.doc()) }
 }

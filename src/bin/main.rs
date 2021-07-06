@@ -4,7 +4,7 @@ use conrod_core::{text::rt::Rect, Scalar};
 use conrod_example_shared as example;
 use conrod_piston::{draw::primitives as draw_primitives, event::convert};
 use example::DemoApp;
-use pagepal::{fullscreen, library::Library, theme, Manga, Novel};
+use pagepal::{fullscreen, library::Library, theme, Manga, Novel, APPNAME};
 use piston_window::{
     texture::{Format::Rgba8, UpdateTexture},
     AdvancedWindow,
@@ -39,7 +39,7 @@ pub async fn main() {
     let _library: Library<Novel, Manga> = Library::default();
 
     let mut window: PistonWindow<Sdl2Window> =
-        WindowSettings::new("Pagepal conrod testing", [WIDTH, HEIGHT])
+        WindowSettings::new(APPNAME, [WIDTH, HEIGHT])
             .samples(16)
             .exit_on_esc(true)
             .vsync(true)

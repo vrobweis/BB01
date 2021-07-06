@@ -1,20 +1,38 @@
-#![allow(dead_code)]
+use crate::{Content, Media, Page};
+use futures::future::join_all;
+use reqwest::Client;
 use serde::{Deserialize as des, Serialize as ser};
 
-pub trait ChapterTrait {}
-#[derive(Clone, Default, Debug, ser, des)]
-pub struct Chapter<T>
-where
-    T: ChapterTrait, {
-    pub cnt: T,
+#[derive(Debug, Clone, Default, ser, des)]
+pub struct Chapter<T: Media> {
+    pub id:  u16,
+    pub src: Option<Page>,
+    #[serde(skip)]
+    pub cnt: Vec<Content<T>>,
 }
-impl<I: ChapterTrait> Chapter<I> {
-    fn new<T: IntoIterator<IntoIter = I>>(t: T) -> Self {
-        Chapter { cnt: t.into_iter() }
+impl<T: Media> Chapter<T> {
+    pub async fn set_cnt(
+        &mut self, content: Option<Vec<Content<T>>>,
+    ) -> &Vec<Content<T>> {
+        match content {
+            Some(c) => self.cnt = c,
+            None => self.cnt = self.content(&Client::new()).await,
+        }
+        &self.cnt
     }
-}
-impl<T: IntoIterator<Item = T, IntoIter = T> + ChapterTrait> From<T>
-    for Chapter<T>
-{
-    fn from(t: T) -> Chapter<T::IntoIter> { Chapter { cnt: t.into_iter() } }
+
+    pub async fn content(&self, client: &Client) -> Vec<Content<T>> {
+        let r = self.src.as_ref().unwrap().get_content::<T>().unwrap();
+        if T::visual() {
+            join_all(r.iter().map(|s| Page::from(s)).map(|a| async move {
+                let p = Page::get_image(&a, client).await;
+                (a, Content::from(p)).into()
+            }))
+            .await
+        } else {
+            vec![
+                (self.src.clone().unwrap(), Content::from(r.join("\n\n"))).into(),
+            ]
+        }
+    }
 }

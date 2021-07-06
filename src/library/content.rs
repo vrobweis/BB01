@@ -33,6 +33,11 @@ impl Media for Manga {
     fn get(&self) -> &[u8] { &self }
 }
 
+pub enum MediaData {
+    Picture(Page, Vec<String>),
+    Text(Page, Vec<u8>),
+}
+
 #[derive(Debug, Clone, Default, Eq, PartialEq, ser, des)]
 pub struct Num(pub u16, pub Option<u8>);
 #[derive(Debug, Clone, Default, Eq, PartialEq, ser, des)]
